@@ -28,6 +28,7 @@ import urllib.parse
 from aje_cdk_libs.constants.project_config import ProjectConfig
 import pandas as pd
 import logging
+import json
 
 # Al inicio de tu clase o archivo
 logger = logging.getLogger(__name__)
@@ -608,34 +609,34 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         layer_jobs = self._load_jobs_configuration()
         
         # Crear máquina de estado para capa de dominio
-        if 'dominio' in layer_jobs:
+        if 'domain' in layer_jobs:
             dominio_config = StepFunctionConfig(
-                name="analytics_dominio",
+                name=f"{self.BUSINESS_PROCESS}_analytics_domain",
                 definition=self._build_layer_definition(
-                    layer='dominio',
+                    layer='domain',
                     jobs=layer_jobs['dominio'],
                     crawler_name=self.crawler_dominio.crawler_name if hasattr(self, 'crawler_dominio') else None
                 )
             )
-            self.state_machine_dominio = self.builder.build_step_function(dominio_config)
+            self.state_machine_domain = self.builder.build_step_function(dominio_config)
         
         # Crear máquina de estado para capa comercial
-        if 'comercial' in layer_jobs:
+        if 'analytics' in layer_jobs:
             comercial_config = StepFunctionConfig(
-                name="analytics_comercial", 
+                name=f"{self.BUSINESS_PROCESS}_analytics_analytics", 
                 definition=self._build_layer_definition(
                     layer='comercial',
                     jobs=layer_jobs['comercial'],
                     crawler_name=self.crawler_comercial.crawler_name if hasattr(self, 'crawler_comercial') else None
                 )
             )
-            self.state_machine_comercial = self.builder.build_step_function(comercial_config)
+            self.state_machine_analytics = self.builder.build_step_function(comercial_config)
 
     def _create_orchestration_state_machine(self):
         """Create the main orchestration state machine"""
         
         orchestration_config = StepFunctionConfig(
-            name="analytics_orchestrate",
+            name=f"{self.BUSINESS_PROCESS}_analytics_orchestrate",
             definition=self._build_orchestration_definition()
         )
         
@@ -797,7 +798,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         # Ejecutar dominio primero
         execute_dominio = tasks.StepFunctionsStartExecution(
             self, "ExecuteDominio", 
-            state_machine=self.state_machine_dominio,
+            state_machine=self.state_machine_domain,
             input=sfn.TaskInput.from_object({
                 "exe_process_id.$": "$.exe_process_id",
                 "COD_PAIS.$": "$.COD_PAIS",
@@ -818,7 +819,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         if hasattr(self, 'state_machine_comercial'):
             execute_comercial = tasks.StepFunctionsStartExecution(
                 self, "ExecuteComercial",
-                state_machine=self.state_machine_comercial,
+                state_machine=self.state_machine_analytics,
                 input=sfn.TaskInput.from_object({
                     "exe_process_id.$": "$.exe_process_id",
                     "COD_PAIS.$": "$.COD_PAIS",
