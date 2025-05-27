@@ -27,6 +27,11 @@ from dotenv import load_dotenv
 import urllib.parse
 from aje_cdk_libs.constants.project_config import ProjectConfig
 import pandas as pd
+import logging
+
+# Al inicio de tu clase o archivo
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 class GlueJobAnalyticsConfig:
     layer: str
@@ -224,9 +229,340 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         self.lambda_crawler = self.builder.build_lambda_function(lambda_config)
         
     def create_glue_jobs(self):
-        """Create a job definition for the Datalake Ingest BigMagic stack"""
-        self.__build_glue_job("domain")
-        self.__build_glue_job("analytics")
+        """Create Glue job definitions for the Datalake Analytics stack"""
+        
+        # 1. Cargar configuración desde archivos separados por capa
+        jobs_config = self._load_jobs_from_separate_files()
+        
+        # 2. Crear jobs, databases y crawlers
+        self.glue_jobs = {}
+        self.cr_targets = {}
+        self.state_machine_order_list = {}
+        self.relation_process = {}
+        
+        # 3. Procesar cada capa
+        for layer, jobs_data in jobs_config.items():
+            if jobs_data:  # Solo procesar si hay datos
+                self._build_glue_jobs_for_layer(layer, jobs_data)
+                logger.info(f"Created {len(jobs_data)} Glue jobs for layer: {layer}")
+        
+        # 4. Crear jobs especiales de Redshift
+        self._create_redshift_jobs()
+        
+        # 5. Crear databases y crawlers
+        self._create_glue_databases_and_crawlers()
+
+    def _load_jobs_from_separate_files(self) -> dict:
+        """Load Glue jobs configuration from separate CSV files (domain.csv and analytics.csv)"""
+        import pandas as pd
+        
+        jobs_by_layer = {}
+        
+        # Mapeo de archivos a capas
+        file_layer_mapping = {
+            'domain.csv': 'domain',
+            'analytics.csv': 'analytics'
+        }
+        
+        for filename, layer_name in file_layer_mapping.items():
+            csv_path = f"{self.Paths.LOCAL_ARTIFACTS_GLUE_CONFIG}/{filename}"
+            
+            try:
+                logger.info(f"Loading jobs configuration from: {csv_path}")
+                df = pd.read_csv(csv_path, delimiter=';')
+                
+                if not df.empty:
+                    jobs_data = df.to_dict('records')
+                    jobs_by_layer[layer_name] = jobs_data
+                    
+                    # Procesar relaciones de proceso mientras cargamos
+                    self._process_job_relations(jobs_data, layer_name)
+                    
+                    logger.info(f"Loaded {len(jobs_data)} jobs for layer '{layer_name}' from {filename}")
+                else:
+                    logger.warning(f"No jobs found in {filename}")
+                    jobs_by_layer[layer_name] = []
+                    
+            except FileNotFoundError:
+                logger.warning(f"Configuration file not found: {csv_path}")
+                jobs_by_layer[layer_name] = []
+            except Exception as e:
+                logger.error(f"Error loading {filename}: {str(e)}")
+                jobs_by_layer[layer_name] = []
+        
+        return jobs_by_layer
+
+    def _process_job_relations(self, jobs_data: list, layer_name: str):
+        """Process job relations for Step Function arguments"""
+        
+        for job_data in jobs_data:
+            process_id = str(job_data.get('process_id', '10'))
+            
+            if process_id not in self.relation_process:
+                self.relation_process[process_id] = []
+            
+            self.relation_process[process_id].append({
+                'table': job_data['procedure'],
+                'periods': job_data.get('periods', 2),
+                'layer': layer_name  # Usar el nombre de capa mapeado
+            })
+
+    def _build_glue_jobs_for_layer(self, layer: str, jobs_config: list):
+        """Build Glue jobs for a specific layer"""
+        
+        # Inicializar estructuras si no existen
+        if layer not in self.glue_jobs:
+            self.glue_jobs[layer] = {}
+        
+        if layer not in self.cr_targets:
+            self.cr_targets[layer] = []
+        
+        if layer not in self.state_machine_order_list:
+            self.state_machine_order_list[layer] = {}
+        
+        # Crear argumentos base para jobs (ahora incluye las relaciones procesadas)
+        jobs_args = self._build_jobs_arguments()
+        
+        for job_data in jobs_config:
+            procedure_name = job_data['procedure']
+            
+            # Validar que el script existe
+            script_path = f"{self.Paths.AWS_ARTIFACTS_GLUE_CODE_ANALYTICS}/models/{layer}/{procedure_name}.py"
+            
+            try:
+                # Crear configuración del job
+                job_config = GlueJobConfig(
+                    job_name=f"{layer}-{procedure_name}",
+                    executable=glue.JobExecutable.python_etl(
+                        glue_version=self._get_glue_version(job_data.get('glue_version', '4')),
+                        python_version=glue.PythonVersion.THREE,
+                        script=glue.Code.from_bucket(
+                            self.s3_artifacts_bucket, 
+                            script_path
+                        )
+                    ),
+                    default_arguments={
+                        **jobs_args,
+                        '--PROCESS_NAME': f"{self.PROJECT_CONFIG.enterprise}-{self.PROJECT_CONFIG.environment.value}-{self.PROJECT_CONFIG.project_name}-{layer}-{procedure_name}-job",
+                        '--FLOW_NAME': layer,
+                        '--PERIODS': str(job_data.get('periods', 2))
+                    },
+                    worker_type=self._get_worker_type(job_data.get('worker_type', 'G.1X')),
+                    worker_count=job_data.get('num_workers', 2),
+                    continuous_logging=glue.ContinuousLoggingProps(enabled=True),
+                    timeout=Duration.hours(1),
+                    max_concurrent_runs=100
+                )
+                
+                # Crear el job usando ResourceBuilder
+                glue_job = self.builder.build_glue_job(job_config)
+                
+                # Agregar permisos necesarios
+                self._grant_job_permissions(glue_job)
+                
+                # Guardar referencia del job
+                self.glue_jobs[layer][procedure_name] = glue_job
+                
+                # Crear target para crawler (ubicación S3 donde escribe el job)
+                s3_target_path = f"athenea/analytics/{layer}/{procedure_name}/"
+                self.cr_targets[layer].append(
+                    glue.CfnCrawler.DeltaTargetProperty(
+                        create_native_delta_table=False,
+                        delta_tables=[f"s3://{self.s3_analytics_bucket.bucket_name}/{s3_target_path}"],
+                        write_manifest=True
+                    )
+                )
+                
+                # Organizar para Step Functions si tiene orden de ejecución
+                exe_order = job_data.get('exe_order', 0)
+                if exe_order > 0:
+                    self._add_to_execution_order(layer, job_data, glue_job.job_name)
+                    
+                logger.info(f"Created Glue job: {glue_job.job_name}")
+                
+            except Exception as e:
+                logger.error(f"Failed to create Glue job for {layer}/{procedure_name}: {str(e)}")
+                continue
+
+    def _add_to_execution_order(self, layer: str, job_data: dict, job_name: str):
+        """Add job to Step Function execution order"""
+        
+        exe_order = job_data.get('exe_order', 0)
+        order_key = str(exe_order)
+        
+        if order_key not in self.state_machine_order_list[layer]:
+            self.state_machine_order_list[layer][order_key] = []
+        
+        self.state_machine_order_list[layer][order_key].append({
+            'table': job_data['procedure'],
+            'process_id': str(job_data.get('process_id', '10')),
+            'job_name': job_name
+        })
+
+    def _grant_job_permissions(self, glue_job):
+        """Grant necessary permissions to Glue job"""
+        
+        # Permisos S3
+        self.s3_artifacts_bucket.grant_read(glue_job)
+        self.s3_external_bucket.grant_read_write(glue_job)
+        self.s3_stage_bucket.grant_read_write(glue_job)
+        self.s3_analytics_bucket.grant_read_write(glue_job)
+        
+        # Permisos DynamoDB
+        read_dynamodb_policy = iam.PolicyStatement(
+            effect=iam.Effect.ALLOW,
+            actions=["dynamodb:Scan"],
+            resources=["*"]
+        )
+        glue_job.role.add_to_policy(read_dynamodb_policy)
+        
+        # Permisos SNS
+        publish_sns_policy = iam.PolicyStatement(
+            actions=["sns:Publish"],
+            resources=[self.sns_failed_topic.topic_arn]
+        )
+        glue_job.role.add_to_policy(publish_sns_policy)
+
+    def _build_jobs_arguments(self) -> dict:
+        """Build common arguments for all Glue jobs"""
+        
+        base_args = {
+            '--extra-py-files': f's3://{self.s3_artifacts_bucket.bucket_name}/{self.Paths.AWS_ARTIFACTS_GLUE_LAYER}/common_jobs_functions.py',
+            '--S3_PATH_STG': f"s3a://{self.s3_stage_bucket.bucket_name}/{self.TEAM}/",
+            '--S3_PATH_ANALYTICS': f"s3a://{self.s3_analytics_bucket.bucket_name}/{self.TEAM}/{self.BUSINESS_PROCESS}/",
+            '--S3_PATH_EXTERNAL': f"s3a://{self.s3_external_bucket.bucket_name}/{self.TEAM}/",
+            '--S3_PATH_ARTIFACTS': f"s3a://{self.s3_landing_bucket.bucket_name}/{self.Paths.AWS_ARTIFACTS_GLUE}/",
+            '--S3_PATH_ARTIFACTS_CSV': f"s3a://{self.s3_artifacts_bucket.bucket_name}/{self.Paths.AWS_ARTIFACTS_GLUE_CSV}",
+            '--REGION_NAME': self.PROJECT_CONFIG.region_name,
+            '--DYNAMODB_DATABASE_NAME': self.dynamodb_credentials_table.table_name,
+            '--DYNAMODB_LOGS_TABLE': self.dynamodb_logs_table.table_name,
+            '--COD_PAIS': 'PE',
+            '--INSTANCIAS': 'PE',
+            '--COD_SUBPROCESO': '0',
+            '--ERROR_TOPIC_ARN': self.sns_failed_topic.topic_arn,
+            '--PROJECT_NAME': self.PROJECT_CONFIG.app_config["team"],
+            '--datalake-formats': "delta",
+            '--enable-continuous-log-filter': "true",
+            '--LOAD_PROCESS': '10',
+            '--ORIGIN': 'AJE'
+        }
+        
+        # Agregar relaciones de proceso como argumentos (equivalente al --P{key})
+        for key, value in self.relation_process.items():
+            base_args[f'--P{key}'] = json.dumps(value)
+        
+        return base_args
+
+    def _create_redshift_jobs(self):
+        """Create special Glue jobs for Redshift operations"""
+        
+        jobs_args = self._build_jobs_arguments()
+        
+        # Job para cargar datos finales a Redshift
+        redshift_config = GlueJobConfig(
+            job_name="load_to_redshift",
+            executable=glue.JobExecutable.python_etl(
+                glue_version=glue.GlueVersion.V4_0,
+                python_version=glue.PythonVersion.THREE,
+                script=glue.Code.from_bucket(
+                    self.s3_artifacts_bucket,
+                    f"{self.Paths.AWS_ARTIFACTS_GLUE_CODE_ANALYTICS}/redshift/load_to_redshift.py"
+                )
+            ),
+            default_arguments=jobs_args,
+            worker_type=glue.WorkerType.G_1_X,
+            worker_count=2,
+            connections=[self.glue_redshift_connection] if hasattr(self, 'glue_redshift_connection') else [],
+            continuous_logging=glue.ContinuousLoggingProps(enabled=True),
+            timeout=Duration.hours(2),
+            max_concurrent_runs=10
+        )
+        
+        self.load_to_redshift_job = self.builder.build_glue_job(redshift_config)
+        
+        # Job para cargar datos de stage a Redshift
+        stage_redshift_config = GlueJobConfig(
+            job_name="load_stage_to_redshift",
+            executable=glue.JobExecutable.python_etl(
+                glue_version=glue.GlueVersion.V4_0,
+                python_version=glue.PythonVersion.THREE,
+                script=glue.Code.from_bucket(
+                    self.s3_artifacts_bucket,
+                    f"{self.Paths.AWS_ARTIFACTS_GLUE_CODE_ANALYTICS}/redshift/load_stage_to_redshift.py"
+                )
+            ),
+            default_arguments=jobs_args,
+            worker_type=glue.WorkerType.G_1_X,
+            worker_count=2,
+            connections=[self.glue_redshift_connection] if hasattr(self, 'glue_redshift_connection') else [],
+            continuous_logging=glue.ContinuousLoggingProps(enabled=True),
+            timeout=Duration.hours(2),
+            max_concurrent_runs=10
+        )
+        
+        self.load_stage_to_redshift_job = self.builder.build_glue_job(stage_redshift_config)
+
+    def _create_glue_databases_and_crawlers(self):
+        """Create Glue databases and crawlers for each layer"""
+        
+        self.databases_layers = {}
+        self.crawlers_layers = {}
+        
+        for layer_key, targets in self.cr_targets.items():
+            if not targets:  # Skip if no targets
+                continue
+                
+            # Crear database
+            database_name = f"athenea-{layer_key}-analytics-db"
+            
+            database = glue.CfnDatabase(
+                self, f"Database{layer_key.title()}",
+                catalog_id=self.account,
+                database_input=glue.CfnDatabase.DatabaseInputProperty(
+                    name=database_name
+                )
+            )
+            
+            self.databases_layers[layer_key] = database
+            
+            # Crear crawler
+            crawler_name = f"{self.PROJECT_CONFIG.enterprise}-{self.PROJECT_CONFIG.environment.value}-{self.PROJECT_CONFIG.project_name}-{layer_key}-crawler"
+            
+            crawler = glue.CfnCrawler(
+                self, f"Crawler{layer_key.title()}",
+                name=crawler_name,
+                database_name=database_name,
+                role=self.glue_crawler_role.role_arn,  # Necesitas crear este rol
+                targets=glue.CfnCrawler.TargetsProperty(delta_targets=targets),
+                schema_change_policy=glue.CfnCrawler.SchemaChangePolicyProperty(
+                    update_behavior="UPDATE_IN_DATABASE",
+                    delete_behavior="DEPRECATE_IN_DATABASE"
+                )
+            )
+            
+            self.crawlers_layers[layer_key] = crawler
+            
+            logger.info(f"Created database and crawler for layer: {layer_key}")
+
+    # Métodos auxiliares que ya tienes
+    def _get_glue_version(self, version_str: str) -> glue.GlueVersion:
+        """Convert version string to GlueVersion enum"""
+        version_map = {
+            '3': glue.GlueVersion.V3_0,
+            '4': glue.GlueVersion.V4_0,
+            '5': glue.GlueVersion.V5_0
+        }
+        return version_map.get(str(version_str), glue.GlueVersion.V4_0)
+
+    def _get_worker_type(self, worker_str: str) -> glue.WorkerType:
+        """Convert worker string to WorkerType enum"""
+        worker_map = {
+            'G.1X': glue.WorkerType.G_1_X,
+            'G.2X': glue.WorkerType.G_2_X,
+            'G.4X': glue.WorkerType.G_4_X,
+            'G.8X': glue.WorkerType.G_8_X
+        }
+        return worker_map.get(worker_str, glue.WorkerType.G_1_X)
 
     def create_step_functions(self):
         """Create Step Function definitions for the Datalake Analytics Commercial workflow"""
