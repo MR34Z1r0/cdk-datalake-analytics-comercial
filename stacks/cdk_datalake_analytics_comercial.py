@@ -672,26 +672,35 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         
         # Obtener configuración de jobs por capa desde CSV
         layer_jobs = self._load_jobs_from_separate_files()
+        
         # Crear máquina de estado para capa de dominio
         if 'domain' in layer_jobs:
+            crawler_name = None
+            if 'domain' in self.crawlers_layers:
+                crawler_name = self.crawlers_layers['domain'].name
+                
             definition = self._build_layer_definition(
-                    layer='dominio',
-                    jobs=layer_jobs['domain'],
-                    crawler_name=self.crawler_dominio.crawler_name if hasattr(self, 'crawler_dominio') else None
-                )
+                layer='dominio',
+                jobs=layer_jobs['domain'],
+                crawler_name=crawler_name
+            )
             dominio_config = StepFunctionConfig(
                 name=f"{self.BUSINESS_PROCESS}_analytics_domain",                
                 definition_body=sfn.DefinitionBody.from_chainable(definition)
             )
             self.state_machine_domain = self.builder.build_step_function(dominio_config)
         
-        # Crear máquina de estado para capa comercial
+        # Crear máquina de estado para capa comercial/analytics
         if 'analytics' in layer_jobs:
+            crawler_name = None
+            if 'analytics' in self.crawlers_layers:
+                crawler_name = self.crawlers_layers['analytics'].name
+                
             definition = self._build_layer_definition(
-                    layer='comercial',
-                    jobs=layer_jobs['analytics'],
-                    crawler_name=self.crawler_comercial.crawler_name if hasattr(self, 'crawler_comercial') else None
-                )
+                layer='comercial',
+                jobs=layer_jobs['analytics'],
+                crawler_name=crawler_name
+            )
             comercial_config = StepFunctionConfig(
                 name=f"{self.BUSINESS_PROCESS}_analytics_analytics",                 
                 definition_body=sfn.DefinitionBody.from_chainable(definition)
@@ -778,15 +787,36 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         
         return validate_execution
 
-    def _build_layer_definition(self, layer: str, jobs: dict, crawler_name: str = None):
+    def _build_layer_definition(self, layer: str, jobs: list, crawler_name: str = None):
         """Build state machine definition for a specific analytical layer"""
+        
+        # Agrupar jobs por orden de ejecución
+        jobs_by_order = {}
+        for job_data in jobs:
+            exe_order = str(job_data.get('exe_order', 0))
+            if exe_order not in jobs_by_order:
+                jobs_by_order[exe_order] = []
+            
+            # Construir nombre del job de Glue usando la convención
+            glue_job_name = f"{self.PROJECT_CONFIG.enterprise}-{self.PROJECT_CONFIG.environment.value.lower()}-{self.PROJECT_CONFIG.project_name}-{self.BUSINESS_PROCESS}_{layer}_{job_data['procedure']}-job"
+            
+            jobs_by_order[exe_order].append({
+                'job_name': job_data['procedure'],
+                'glue_job_name': glue_job_name,
+                'process_id': str(job_data.get('process_id', '10')),
+                'periods': job_data.get('periods', 2)
+            })
         
         # Crear estados paralelos por orden de ejecución
         current_state = None
         initial_state = None
         
         # Procesar jobs agrupados por orden de ejecución
-        for order in sorted(jobs.keys()):
+        for order in sorted(jobs_by_order.keys()):
+            # Solo procesar órdenes mayores a 0
+            if int(order) <= 0:
+                continue
+                
             # Crear estado paralelo para este orden
             parallel_state = sfn.Parallel(
                 self, f"{layer.title()}Order{order}",
@@ -794,7 +824,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
             )
             
             # Agregar cada job como rama paralela
-            for job_config in jobs[order]:
+            for job_config in jobs_by_order[order]:
                 job_execution = tasks.StepFunctionsStartExecution(
                     self, f"Execute{job_config['job_name'].title()}",
                     state_machine=self.state_machine_base,
