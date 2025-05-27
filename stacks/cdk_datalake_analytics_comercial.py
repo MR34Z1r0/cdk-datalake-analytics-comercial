@@ -54,6 +54,12 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         self.DOMAIN = self.PROJECT_CONFIG.app_config["domain"]
         self.ANALYTICS = self.PROJECT_CONFIG.app_config["analytics"]
         
+        # Inicializar estructuras de datos AQUÍ, antes de cualquier otro método
+        self.glue_jobs = {}
+        self.cr_targets = {}
+        self.state_machine_order_list = {}
+        self.relation_process = {}  # ← Esta línea faltaba
+
         self.import_s3_buckets()
         self.import_dynamodb_tables()
         self.import_sns_topics()
@@ -235,10 +241,10 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         jobs_config = self._load_jobs_from_separate_files()
         
         # 2. Crear jobs, databases y crawlers
-        self.glue_jobs = {}
-        self.cr_targets = {}
-        self.state_machine_order_list = {}
-        self.relation_process = {}
+        #self.glue_jobs = {}
+        #self.cr_targets = {}
+        #self.state_machine_order_list = {}
+        #self.relation_process = {}
         
         # 3. Procesar cada capa
         for layer, jobs_data in jobs_config.items():
@@ -581,7 +587,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         
         # Configuración base para máquinas de estado
         base_config = StepFunctionConfig(
-            name="analytics_base",
+            name=f"{self.BUSINESS_PROCESS}_analytics_base",
             definition=self._build_base_definition()
         )
         
@@ -589,7 +595,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         
         # Máquina de estado específica para Redshift
         redshift_config = StepFunctionConfig(
-            name="analytics_base_redshift", 
+            name=f"{self.BUSINESS_PROCESS}_analytics_base_redshift", 
             definition=self._build_redshift_base_definition()
         )
         
@@ -790,7 +796,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         
         # Ejecutar dominio primero
         execute_dominio = tasks.StepFunctionsStartExecution(
-            self, "ExecuteDominio",
+            self, "ExecuteDominio", 
             state_machine=self.state_machine_dominio,
             input=sfn.TaskInput.from_object({
                 "exe_process_id.$": "$.exe_process_id",
@@ -806,6 +812,9 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
             result_path="$.layer_results"
         )
         
+        # Variable para controlar si se agregaron ramas
+        has_parallel_branches = False
+        
         if hasattr(self, 'state_machine_comercial'):
             execute_comercial = tasks.StepFunctionsStartExecution(
                 self, "ExecuteComercial",
@@ -818,6 +827,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
                 integration_pattern=sfn.IntegrationPattern.RUN_JOB
             )
             parallel_execution.branch(execute_comercial)
+            has_parallel_branches = True
         
         # Notificación de éxito
         success_notification = tasks.SnsPublish(
@@ -833,7 +843,8 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         # Construir flujo principal
         definition = execute_dominio
         
-        if parallel_execution.branches:
+        # Solo agregar parallel_execution si tiene ramas
+        if has_parallel_branches:
             definition = definition.next(parallel_execution)
         
         definition = definition.next(success_notification)
