@@ -903,29 +903,6 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
             integration_pattern=sfn.IntegrationPattern.RUN_JOB
         )
         
-        # Ejecutar comercial en paralelo (si existe)
-        parallel_execution = sfn.Parallel(
-            self, "ExecuteAnalyticalLayers",
-            result_path="$.layer_results"
-        )
-        
-        # Variable para controlar si se agregaron ramas
-        has_parallel_branches = False
-        
-        if hasattr(self, 'state_machine_comercial'):
-            execute_comercial = tasks.StepFunctionsStartExecution(
-                self, "ExecuteComercial",
-                state_machine=self.state_machine_analytics,
-                input=sfn.TaskInput.from_object({
-                    "exe_process_id.$": "$.exe_process_id",
-                    "COD_PAIS.$": "$.COD_PAIS",
-                    "INSTANCIAS.$": "$.INSTANCIAS"
-                }),
-                integration_pattern=sfn.IntegrationPattern.RUN_JOB
-            )
-            parallel_execution.branch(execute_comercial)
-            has_parallel_branches = True
-        
         # Notificación de éxito
         success_notification = tasks.SnsPublish(
             self, "NotifySuccess",
@@ -937,14 +914,31 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
             })
         )
         
-        # Construir flujo principal
-        definition = execute_dominio
-        
-        # Solo agregar parallel_execution si tiene ramas
-        if has_parallel_branches:
-            definition = definition.next(parallel_execution)
-        
-        definition = definition.next(success_notification)
+        # Verificar si existe la máquina de estado de analytics/comercial
+        if hasattr(self, 'state_machine_analytics') and self.state_machine_analytics:
+            # Solo crear parallel si hay máquinas de estado adicionales
+            parallel_execution = sfn.Parallel(
+                self, "ExecuteAnalyticalLayers",
+                result_path="$.layer_results"
+            )
+            
+            execute_comercial = tasks.StepFunctionsStartExecution(
+                self, "ExecuteComercial",
+                state_machine=self.state_machine_analytics,
+                input=sfn.TaskInput.from_object({
+                    "exe_process_id.$": "$.exe_process_id",
+                    "COD_PAIS.$": "$.COD_PAIS",
+                    "INSTANCIAS.$": "$.INSTANCIAS"
+                }),
+                integration_pattern=sfn.IntegrationPattern.RUN_JOB
+            )
+            parallel_execution.branch(execute_comercial)
+            
+            # Construir flujo con parallel
+            definition = execute_dominio.next(parallel_execution).next(success_notification)
+        else:
+            # Flujo simple sin parallel si no hay máquinas adicionales
+            definition = execute_dominio.next(success_notification)
         
         return definition
 
