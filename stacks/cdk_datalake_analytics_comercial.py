@@ -26,6 +26,7 @@ import os
 from dotenv import load_dotenv
 import urllib.parse
 from aje_cdk_libs.constants.project_config import ProjectConfig
+import pandas as pd
 
 class GlueJobAnalyticsConfig:
     layer: str
@@ -107,7 +108,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         
         self.builder.deploy_s3_bucket(config)
     
-    def __load_data_config(file_path: str):
+    def __load_data_config(self, file_path: str):
         """Load the Glue job configuration from a JSON file"""
         data = []
         df = pd.read_csv(file_path, delimiter = ';')
@@ -124,7 +125,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
             '--S3_PATH_ANALYTICS' : f"s3a://{self.s3_analytics_bucket.bucket_name}/{self.TEAM}/{self.BUSINESS_PROCESS}/",
             '--S3_PATH_EXTERNAL' : f"s3a://{self.s3_external_bucket.bucket_name}/{self.TEAM}/",
             '--S3_PATH_ARTIFACTS' : f"s3a://{self.s3_landing_bucket.bucket_name}/{self.TEAM}/{self.BUSINESS_PROCESS}/",
-            '--S3_PATH_ARTIFACTS_CSV': f"s3a://{self.s3_artifacts_bucket.bucket_name}/{self.Path.AWS_ARTIFACTS_GLUE_CSV}",
+            '--S3_PATH_ARTIFACTS_CSV': f"s3a://{self.s3_artifacts_bucket.bucket_name}/{self.Paths.AWS_ARTIFACTS_GLUE_CSV}",
             '--CATALOG_CONNECTION' : None,
             '--REGION_NAME' : self.PROJECT_CONFIG.region_name,
             '--DYNAMODB_DATABASE_NAME' : self.dynamodb_credentials_table.table_name,
@@ -138,11 +139,11 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
             '--enable-continuous-log-filter' : "true"
         }
 
-        file_path = f"{self.Paths.LOCAL_ARTIFACTS_GLUE_CONFIG}/{layer}"
+        file_path = f"{self.Paths.LOCAL_ARTIFACTS_GLUE_CONFIG}/{layer}.csv"
         
         configs = self.__load_data_config(file_path)
         for config in configs:
-            job_name=f"{config["layer"]}-{config["job_name"]}"
+            job_name=f"{config["layer"]}-{config["procedure"]}"
             config["environment"]['--PROCESS_NAME'] = job_name
 
             config = GlueJobConfig(
@@ -224,188 +225,374 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         
     def create_glue_jobs(self):
         """Create a job definition for the Datalake Ingest BigMagic stack"""
-        self.__build_glue_job("dominio")
-        self.__build_glue_job("comercial")
+        self.__build_glue_job("domain")
+        self.__build_glue_job("analytics")
 
     def create_step_functions(self):
-        """Create a Step Function definition for the Datalake Ingestion workflow"""
-        LAMBDA_RETRY = 2
-        GLUE_RETRY = 2
+        """Create Step Function definitions for the Datalake Analytics Commercial workflow"""
+    
+        # 1. Crear las máquinas de estado base para validación concurrente
+        self._create_base_state_machines()
+        
+        # 2. Crear las máquinas de estado por capas (dominio, comercial)
+        self._create_layer_state_machines()
+        
+        # 3. Crear la máquina de estado de orquestación principal
+        self._create_orchestration_state_machine()
 
-        # Process Table preparation task
-        prepare_table = tasks.LambdaInvoke(
-            self, "Prepare Table",
-            lambda_function=self.lambda_prepare_table,
-            result_path="$",
-            output_path="$.Payload"
+    def _create_base_state_machines(self):
+        """Create base state machines for job validation and execution"""
+        
+        # Configuración base para máquinas de estado
+        base_config = StepFunctionConfig(
+            name="analytics_base",
+            definition=self._build_base_definition()
         )
         
-        prepare_table.add_retry(
-            errors=["Lambda.ClientExecutionTimeoutException", "Lambda.ServiceException", 
-                    "Lambda.AWSLambdaException", "Lambda.SdkClientException"],
-            interval=Duration.seconds(2),
-            max_attempts=LAMBDA_RETRY,
-            backoff_rate=2
+        self.state_machine_base = self.builder.build_step_function(base_config)
+        
+        # Máquina de estado específica para Redshift
+        redshift_config = StepFunctionConfig(
+            name="analytics_base_redshift", 
+            definition=self._build_redshift_base_definition()
         )
         
-        # Get endpoint Lambda task
-        get_endpoint = tasks.LambdaInvoke(
-            self, "get endpoint",
-            lambda_function=self.lambda_get_endpoint,
-            output_path="$.Payload"
+        self.state_machine_base_redshift = self.builder.build_step_function(redshift_config)
+
+    def _create_layer_state_machines(self):
+        """Create state machines for each analytical layer"""
+        
+        # Obtener configuración de jobs por capa desde CSV
+        layer_jobs = self._load_jobs_configuration()
+        
+        # Crear máquina de estado para capa de dominio
+        if 'dominio' in layer_jobs:
+            dominio_config = StepFunctionConfig(
+                name="analytics_dominio",
+                definition=self._build_layer_definition(
+                    layer='dominio',
+                    jobs=layer_jobs['dominio'],
+                    crawler_name=self.crawler_dominio.crawler_name if hasattr(self, 'crawler_dominio') else None
+                )
+            )
+            self.state_machine_dominio = self.builder.build_step_function(dominio_config)
+        
+        # Crear máquina de estado para capa comercial
+        if 'comercial' in layer_jobs:
+            comercial_config = StepFunctionConfig(
+                name="analytics_comercial", 
+                definition=self._build_layer_definition(
+                    layer='comercial',
+                    jobs=layer_jobs['comercial'],
+                    crawler_name=self.crawler_comercial.crawler_name if hasattr(self, 'crawler_comercial') else None
+                )
+            )
+            self.state_machine_comercial = self.builder.build_step_function(comercial_config)
+
+    def _create_orchestration_state_machine(self):
+        """Create the main orchestration state machine"""
+        
+        orchestration_config = StepFunctionConfig(
+            name="analytics_orchestrate",
+            definition=self._build_orchestration_definition()
         )
         
-        get_endpoint.add_retry(
-            errors=["Lambda.ClientExecutionTimeoutException", "Lambda.ServiceException", 
-                    "Lambda.AWSLambdaException", "Lambda.SdkClientException"],
-            interval=Duration.seconds(2),
-            max_attempts=LAMBDA_RETRY,
-            backoff_rate=2
-        )
+        self.state_machine_analytics = self.builder.build_step_function(orchestration_config)
+
+    def _build_base_definition(self):
+        """Build the base state machine definition for job validation"""
         
-        # Check Execute Raw choice state
-        check_execute_raw = sfn.Choice(self, "Check Execute Raw")
-        
-        # Normalize output when execute_raw is false
-        normalize_output_when_false = sfn.Pass(
-            self, "normalize output when false",
-            parameters={
-                "raw_job_result": {
-                    "JobRunId": "N/A-skipped",
-                    "Status": "SKIPPED"
-                },
-                "dynamodb_key.$": "$.dynamodb_key",
-                "process.$": "$.process",
-                "execute_raw.$": "$.execute_raw"
-            }
-        )
-        
-        # Error handling for raw job
-        error_raw_job = sfn.Pass(
-            self, "error raw job",
-            result_path="$.raw_job_error_result",
-            output_path="$"
-        )
-        
-        # Raw job Glue task
-        raw_job = tasks.GlueStartJobRun(
-            self, "raw job",
-            glue_job_name=self.job_extract_data_bigmagic.job_name,
-            integration_pattern=sfn.IntegrationPattern.RUN_JOB,
-            arguments=sfn.TaskInput.from_object({
-                "--TABLE_NAME.$": "$.dynamodb_key.table"
+        # Task: Validar ejecución concurrente
+        validate_execution = tasks.LambdaInvoke(
+            self, "ValidateExecution",
+            lambda_function=self.lambda_get_data,
+            payload=sfn.TaskInput.from_object({
+                "exe_process_id.$": "$.exe_process_id",
+                "own_process_id.$": "$.own_process_id",
+                "job_name.$": "$.job_name",
+                "COD_PAIS.$": "$.COD_PAIS",
+                "INSTANCIAS.$": "$.INSTANCIAS",
+                "redshift.$": "$.redshift"
             }),
-            result_path="$.raw_job_result"
+            result_path="$.validation_result"
         )
         
-        raw_job.add_retry(
-            errors=["Glue.AWSGlueException", "Glue.ConcurrentRunsExceededException"],
-            max_attempts=GLUE_RETRY,
-            backoff_rate=5
+        # Choice: Determinar si ejecutar o esperar
+        execution_choice = sfn.Choice(self, "ExecutionChoice")
+        
+        # Wait state para concurrencia
+        wait_state = sfn.Wait(
+            self, "WaitForConcurrency",
+            time=sfn.WaitTime.duration(Duration.seconds(60))
         )
         
-        raw_job.add_catch(
-            errors=["States.TaskFailed"],
-            handler=error_raw_job
-        )
-        
-        # Stage job Glue task
-        stage_job = tasks.GlueStartJobRun(
-            self, "stage job",
-            glue_job_name=self.job_light_transform.job_name,
-            integration_pattern=sfn.IntegrationPattern.RUN_JOB,
+        # Task: Ejecutar job de Glue
+        execute_glue_job = tasks.GlueStartJobRun(
+            self, "ExecuteGlueJob",
+            glue_job_name=sfn.JsonPath.string_at("$.job_name"),
             arguments=sfn.TaskInput.from_object({
-                "--JOB_NAME": self.job_light_transform.job_name,
-                "--TABLE_NAME.$": "$.dynamodb_key.table"
+                "--COD_PAIS.$": "$.COD_PAIS",
+                "--INSTANCIAS.$": "$.INSTANCIAS",
+                "--PERIODS.$": "$.PERIODS"
             }),
-            result_path="$.stage_job_result"
+            integration_pattern=sfn.IntegrationPattern.RUN_JOB
         )
         
-        stage_job.add_retry(
-            errors=["Glue.AWSGlueException", "Glue.ConcurrentRunsExceededException"],
-            max_attempts=GLUE_RETRY,
-            backoff_rate=5
-        )
-        
-        # Standardize map output
-        standardize_map_output = sfn.Pass(
-            self, "standardize map output",
-            result_path=None,
-        )
-        
-        # Crawler job Glue task
-        crawler_job = tasks.GlueStartJobRun(
-            self, "crawler job",
-            glue_job_name=self.job_crawler_stage.job_name,
-            integration_pattern=sfn.IntegrationPattern.RUN_JOB,
-            arguments=sfn.TaskInput.from_object({
-                "--JOB_NAME": self.job_crawler_stage.job_name,
-                "--ENDPOINT.$": "$.endpoint",
-                "--PROCESS_ID.$": "$.process_id"
+        # Error handling
+        error_notification = tasks.SnsPublish(
+            self, "NotifyError",
+            topic=self.sns_failed_topic,
+            message=sfn.TaskInput.from_object({
+                "error": "Job execution failed",
+                "job_name.$": "$.job_name",
+                "timestamp.$": "$$.State.EnteredTime"
             })
         )
         
-        crawler_job.add_retry(
-            errors=["States.ALL"],
-            max_attempts=GLUE_RETRY,
-            backoff_rate=5
+        # Definir flujo
+        validate_execution.next(
+            execution_choice
+            .when(
+                sfn.Condition.boolean_equals("$.validation_result.Payload.wait", True),
+                wait_state.next(validate_execution)
+            )
+            .when(
+                sfn.Condition.boolean_equals("$.validation_result.Payload.error", True),
+                error_notification
+            )
+            .when(
+                sfn.Condition.boolean_equals("$.validation_result.Payload.ready", True),
+                execute_glue_job
+            )
+            .otherwise(sfn.Succeed(self, "SkipExecution"))
         )
         
-        # Define the workflow connections
-        check_execute_raw.when(
-            sfn.Condition.boolean_equals("$.execute_raw", False),
-            normalize_output_when_false
-        ).otherwise(raw_job)
+        return validate_execution
+
+    def _build_layer_definition(self, layer: str, jobs: dict, crawler_name: str = None):
+        """Build state machine definition for a specific analytical layer"""
         
-        normalize_output_when_false.next(stage_job)
-        raw_job.next(stage_job)
-        error_raw_job.next(stage_job)
-        stage_job.next(standardize_map_output)
+        # Crear estados paralelos por orden de ejecución
+        current_state = None
+        initial_state = None
         
-        # Inner Map state for Process Table
-        process_table_map = sfn.Map(
-            self, "Process Table",
-            max_concurrency=15,
-            items_path="$.dynamodb_key",
-            parameters={
-                "dynamodb_key.$": "$$.Map.Item.Value",
-                "process.$": "$.process",
-                "execute_raw.$": "$.execute_raw"
-            },
-            result_selector={
-                "result.$": "$[*]",
-                "status": "COMPLETED"
-            },
-            result_path="$.query_results"
+        # Procesar jobs agrupados por orden de ejecución
+        for order in sorted(jobs.keys()):
+            # Crear estado paralelo para este orden
+            parallel_state = sfn.Parallel(
+                self, f"{layer.title()}Order{order}",
+                result_path="$.execution_results"
+            )
+            
+            # Agregar cada job como rama paralela
+            for job_config in jobs[order]:
+                job_execution = tasks.StepFunctionsStartExecution(
+                    self, f"Execute{job_config['job_name'].title()}",
+                    state_machine=self.state_machine_base,
+                    input=sfn.TaskInput.from_object({
+                        "exe_process_id.$": "$.exe_process_id",
+                        "own_process_id": job_config['process_id'],
+                        "job_name": job_config['glue_job_name'],
+                        "COD_PAIS.$": "$.COD_PAIS",
+                        "INSTANCIAS.$": "$.INSTANCIAS",
+                        "PERIODS": job_config['periods'],
+                        "redshift": False
+                    }),
+                    integration_pattern=sfn.IntegrationPattern.RUN_JOB
+                )
+                parallel_state.branch(job_execution)
+            
+            # Conectar estados secuencialmente
+            if current_state is None:
+                initial_state = parallel_state
+            else:
+                current_state.next(parallel_state)
+            
+            current_state = parallel_state
+        
+        # Agregar crawler al final si existe
+        if crawler_name and current_state:
+            crawler_task = tasks.LambdaInvoke(
+                self, f"RunCrawler{layer.title()}",
+                lambda_function=self.lambda_crawler,
+                payload=sfn.TaskInput.from_object({
+                    "CRAWLER_NAME": crawler_name
+                })
+            )
+            
+            # Wait loop para el crawler
+            crawler_wait = sfn.Wait(
+                self, f"WaitCrawler{layer.title()}",
+                time=sfn.WaitTime.duration(Duration.seconds(60))
+            )
+            
+            crawler_choice = sfn.Choice(self, f"CheckCrawler{layer.title()}")
+            
+            start_crawler = tasks.CallAwsService(
+                self, f"StartCrawler{layer.title()}",
+                service="glue",
+                action="startCrawler",
+                parameters={"Name": crawler_name},
+                iam_resources=["*"]
+            )
+            
+            crawler_task.next(
+                crawler_choice
+                .when(
+                    sfn.Condition.boolean_equals("$.Payload.wait", True),
+                    crawler_wait.next(crawler_task)
+                )
+                .otherwise(start_crawler)
+            )
+            
+            current_state.next(crawler_task)
+        
+        return initial_state or sfn.Succeed(self, f"NoJobs{layer.title()}")
+
+    def _build_orchestration_definition(self):
+        """Build the main orchestration state machine definition"""
+        
+        # Ejecutar dominio primero
+        execute_dominio = tasks.StepFunctionsStartExecution(
+            self, "ExecuteDominio",
+            state_machine=self.state_machine_dominio,
+            input=sfn.TaskInput.from_object({
+                "exe_process_id.$": "$.exe_process_id",
+                "COD_PAIS.$": "$.COD_PAIS",
+                "INSTANCIAS.$": "$.INSTANCIAS"
+            }),
+            integration_pattern=sfn.IntegrationPattern.RUN_JOB
         )
         
-        # Define the inner Map iterator
-        process_table_map.iterator(check_execute_raw)
-        
-        # Connect to get_endpoint and crawler_job
-        process_table_map.next(get_endpoint)
-        get_endpoint.next(crawler_job)
-        
-        # Outer Map state for Process Table Group
-        process_table_group_map = sfn.Map(
-            self, "Process Table Group",
-            max_concurrency=1,
-            items_path="$.table_names",
-            parameters={
-                "dynamodb_key.$": "$$.Map.Item.Value",
-                "process.$": "$.process",
-                "execute_raw.$": "$.execute_raw"
-            },
-            result_path=None
+        # Ejecutar comercial en paralelo (si existe)
+        parallel_execution = sfn.Parallel(
+            self, "ExecuteAnalyticalLayers",
+            result_path="$.layer_results"
         )
         
-        # Define the outer Map iterator
-        process_table_group_map.iterator(prepare_table.next(process_table_map))
-         
-        # Define the complete state machine
-        config = StepFunctionConfig(
-            name="light_transform_bigmagic",
-            definition=process_table_group_map
+        if hasattr(self, 'state_machine_comercial'):
+            execute_comercial = tasks.StepFunctionsStartExecution(
+                self, "ExecuteComercial",
+                state_machine=self.state_machine_comercial,
+                input=sfn.TaskInput.from_object({
+                    "exe_process_id.$": "$.exe_process_id",
+                    "COD_PAIS.$": "$.COD_PAIS",
+                    "INSTANCIAS.$": "$.INSTANCIAS"
+                }),
+                integration_pattern=sfn.IntegrationPattern.RUN_JOB
+            )
+            parallel_execution.branch(execute_comercial)
+        
+        # Notificación de éxito
+        success_notification = tasks.SnsPublish(
+            self, "NotifySuccess",
+            topic=self.sns_success_topic,
+            message=sfn.TaskInput.from_object({
+                "status": "SUCCESS",
+                "message": "Analytics pipeline completed successfully",
+                "timestamp.$": "$$.State.EnteredTime"
+            })
         )
         
-        self.state_function = self.builder.build_step_function(config)
+        # Construir flujo principal
+        definition = execute_dominio
+        
+        if parallel_execution.branches:
+            definition = definition.next(parallel_execution)
+        
+        definition = definition.next(success_notification)
+        
+        return definition
+
+    def _load_jobs_configuration(self) -> dict:
+        """Load Glue jobs configuration from CSV files"""
+        import pandas as pd
+        
+        jobs_by_layer = {}
+        
+        # Cargar configuración de dominio
+        try:
+            df_dominio = pd.read_csv(f"{self.Paths.LOCAL_ARTIFACTS_GLUE_CONFIG}/domain.csv", delimiter=';')
+            jobs_by_layer['dominio'] = self._process_jobs_config(df_dominio, 'dominio')
+        except FileNotFoundError:
+            logger.warning("Domain configuration file not found")
+        
+        # Cargar configuración comercial
+        try:
+            df_comercial = pd.read_csv(f"{self.Paths.LOCAL_ARTIFACTS_GLUE_CONFIG}/analytics.csv", delimiter=';')
+            jobs_by_layer['comercial'] = self._process_jobs_config(df_comercial, 'comercial')
+        except FileNotFoundError:
+            logger.warning("Analytics configuration file not found")
+        
+        return jobs_by_layer
+
+    def _process_jobs_config(self, df: pd.DataFrame, layer: str) -> dict:
+        """Process jobs configuration DataFrame into structured format"""
+        jobs_by_order = {}
+        
+        for _, row in df.iterrows():
+            if row['layer'] != layer:
+                continue
+                
+            order = str(row['exe_order'])
+            if order not in jobs_by_order:
+                jobs_by_order[order] = []
+            
+            # Construir nombre del job de Glue usando la convención
+            glue_job_name = f"{self.PROJECT_CONFIG.enterprise}-{self.PROJECT_CONFIG.environment.value}-{self.PROJECT_CONFIG.project_name}-{layer}-{row['procedure']}-job"
+            
+            jobs_by_order[order].append({
+                'job_name': row['procedure'],
+                'glue_job_name': glue_job_name,
+                'process_id': str(row['process_id']),
+                'periods': row['periods'],
+                'num_workers': row['num_workers']
+            })
+        
+        return jobs_by_order
+
+    def _build_redshift_base_definition(self):
+        """Build base definition for Redshift operations"""
+        import aws_cdk.aws_stepfunctions as sfn
+        import aws_cdk.aws_stepfunctions_tasks as tasks
+        
+        # Similar a _build_base_definition pero específico para Redshift
+        # con parámetros adicionales como LOAD_PROCESS y ORIGIN
+        
+        validate_execution = tasks.LambdaInvoke(
+            self, "ValidateRedshiftExecution",
+            lambda_function=self.lambda_get_data,
+            payload=sfn.TaskInput.from_object({
+                "exe_process_id.$": "$.exe_process_id",
+                "job_name.$": "$.job_name",
+                "COD_PAIS.$": "$.COD_PAIS",
+                "INSTANCIAS.$": "$.INSTANCIAS",
+                "redshift": True
+            }),
+            result_path="$.validation_result"
+        )
+        
+        execute_redshift_job = tasks.GlueStartJobRun(
+            self, "ExecuteRedshiftJob",
+            glue_job_name=sfn.JsonPath.string_at("$.job_name"),
+            arguments=sfn.TaskInput.from_object({
+                "--COD_PAIS.$": "$.COD_PAIS",
+                "--LOAD_PROCESS.$": "$.exe_process_id",
+                "--ORIGIN.$": "$.ORIGIN",
+                "--INSTANCIAS.$": "$.INSTANCIAS"
+            }),
+            integration_pattern=sfn.IntegrationPattern.RUN_JOB
+        )
+        
+        choice = sfn.Choice(self, "RedshiftExecutionChoice")
+        
+        validate_execution.next(
+            choice
+            .when(
+                sfn.Condition.boolean_equals("$.validation_result.Payload.ready", True),
+                execute_redshift_job
+            )
+            .otherwise(sfn.Succeed(self, "SkipRedshiftExecution"))
+        )
+        
+        return validate_execution
