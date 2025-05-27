@@ -22,6 +22,7 @@ from constructs import Construct
 from aje_cdk_libs.builders.resource_builder import ResourceBuilder
 from aje_cdk_libs.models.configs import *
 from aje_cdk_libs.constants.environments import Environments
+from aje_cdk_libs.constants.policies import PolicyUtils
 from constants.paths import Paths
 from constants.layers import Layers
 import os
@@ -66,6 +67,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         self.import_s3_buckets()
         self.import_dynamodb_tables()
         self.import_sns_topics()
+        self.create_iam_roles()
         self.deployment_s3_buckets()
         self.create_lambda_layers()
         self.create_lambdas()
@@ -122,82 +124,142 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         
         self.builder.deploy_s3_bucket(config)
     
-    def __load_data_config(self, file_path: str):
-        """Load the Glue job configuration from a JSON file"""
-        data = []
-        df = pd.read_csv(file_path, delimiter = ';')
-        for index, row in df.iterrows():
-            data.append(row.to_dict())
-        return data
-
-    def __build_glue_job(self, layer: str):
-        """Build a Glue job"""
-
-        jobs_args = {
-            '--extra-py-files' : f's3://{self.s3_artifacts_bucket.bucket_name}/{self.Paths.AWS_ARTIFACTS_GLUE_LAYER}/common_jobs_functions.py',
-            '--S3_PATH_STG': f"s3a://{self.s3_stage_bucket.bucket_name}/{self.TEAM}/",
-            '--S3_PATH_ANALYTICS' : f"s3a://{self.s3_analytics_bucket.bucket_name}/{self.TEAM}/{self.BUSINESS_PROCESS}/",
-            '--S3_PATH_EXTERNAL' : f"s3a://{self.s3_external_bucket.bucket_name}/{self.TEAM}/",
-            '--S3_PATH_ARTIFACTS' : f"s3a://{self.s3_landing_bucket.bucket_name}/{self.TEAM}/{self.BUSINESS_PROCESS}/",
-            '--S3_PATH_ARTIFACTS_CSV': f"s3a://{self.s3_artifacts_bucket.bucket_name}/{self.Paths.AWS_ARTIFACTS_GLUE_CSV}",
-            '--CATALOG_CONNECTION' : None,
-            '--REGION_NAME' : self.PROJECT_CONFIG.region_name,
-            '--DYNAMODB_DATABASE_NAME' : self.dynamodb_credentials_table.table_name,
-            '--DYNAMODB_LOGS_TABLE' : self.dynamodb_logs_table.table_name,
-            '--COD_PAIS' : 'PE',
-            '--INSTANCIAS': 'PE',
-            '--COD_SUBPROCESO': '0',
-            '--ERROR_TOPIC_ARN' : self.sns_failed_topic.topic_arn,
-            '--PROJECT_NAME' : self.PROJECT_CONFIG.app_config["team"],
-            '--datalake-formats' : "delta",
-            '--enable-continuous-log-filter' : "true"
-        }
-
-        file_path = f"{self.Paths.LOCAL_ARTIFACTS_GLUE_CONFIG}/{layer}.csv"
+    def create_iam_roles(self):
+        """Crear roles IAM necesarios"""
         
-        configs = self.__load_data_config(file_path)
-        for config in configs:
-            job_name=f"{config["layer"]}-{config["procedure"]}"
-            config["environment"]['--PROCESS_NAME'] = job_name
-
-            config = GlueJobConfig(
-                job_name=job_name,
-                executable=glue_alpha.JobExecutable.python_etl(
-                    glue_version=glue_alpha.GlueVersion.V5_0,
-                    python_version=glue_alpha.PythonVersion.THREE,
-                    script=glue_alpha.Code.from_bucket(self.s3_artifacts_bucket.bucket_name, f"{self.Paths.AWS_ARTIFACTS_GLUE_CODE_ANALYTICS}/{config['layer']}/{config['job_name']}.py")
-                ),
-                default_arguments=config["environment"],
-                continuous_logging=glue_alpha.ContinuousLoggingProps(enabled=True),
-                timeout=Duration.minutes(60),
-                max_concurrent_runs=200
-            )
-            job_glue = self.builder.build_glue_job(config)
-
-            # Grant permissions to the Glue job
-            self.s3_artifact_bucket.grant_read(job_glue)
-            self.s3_external_bucket.grant_read_write(job_glue)
-            self.s3_stage_bucket.grant_read_write(job_glue)
-            self.s3_analytics_bucket.grant_read_write(job_glue)
-
-            # IAM policies for Glue job
-            read_dynamodb_policy = iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "dynamodb:Scan"
-                ],
-                resources=["*"]
-            )
-            publish_sns_policy = iam.PolicyStatement(
-                actions=POLICY_UTILS.SNS_PUBLIS_PERMISSIONS,
-                resources=[
-                    self.sns_failed_topic.topic_arn,
-                ]
-            )
-
-            # Attach policies to the Glue job role
-            job_glue.role.add_to_policy(read_dynamodb_policy)
-            job_glue.role.add_to_policy(publish_sns_policy)
+        # Role para Glue Jobs
+        glue_job_role_config = RoleConfig(
+            role_name="glue-analytics-job-role",
+            assumed_by=iam.ServicePrincipal("glue.amazonaws.com"),
+            managed_policies=[
+                iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AWSGlueServiceRole")
+            ],
+            inline_policies={
+                "S3AccessPolicy": iam.PolicyDocument(
+                    statements=[
+                        iam.PolicyStatement(
+                            effect=iam.Effect.ALLOW,
+                            actions=PolicyUtils.join_permissions(
+                                PolicyUtils.S3_READ,
+                                PolicyUtils.S3_WRITE
+                            ),
+                            resources=[
+                                self.s3_artifacts_bucket.bucket_arn,
+                                f"{self.s3_artifacts_bucket.bucket_arn}/*",
+                                self.s3_external_bucket.bucket_arn,
+                                f"{self.s3_external_bucket.bucket_arn}/*",
+                                self.s3_stage_bucket.bucket_arn,
+                                f"{self.s3_stage_bucket.bucket_arn}/*",
+                                self.s3_analytics_bucket.bucket_arn,
+                                f"{self.s3_analytics_bucket.bucket_arn}/*"
+                            ]
+                        ),
+                        iam.PolicyStatement(
+                            effect=iam.Effect.ALLOW,
+                            actions=PolicyUtils.DYNAMODB_READ,
+                            resources=["*"]
+                        ),
+                        iam.PolicyStatement(
+                            effect=iam.Effect.ALLOW,
+                            actions=PolicyUtils.SNS_PUBLISH,
+                            resources=[self.sns_failed_topic.topic_arn]
+                        )
+                    ]
+                )
+            }
+        )
+        self.glue_job_role = self.builder.build_role(glue_job_role_config)
+        
+        # Role para Glue Crawler
+        glue_crawler_role_config = RoleConfig(
+            role_name="glue-analytics-crawler-role",
+            assumed_by=iam.ServicePrincipal("glue.amazonaws.com"),
+            managed_policies=[
+                iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AWSGlueServiceRole"),
+                iam.ManagedPolicy.from_aws_managed_policy_name("AmazonS3FullAccess"),
+                iam.ManagedPolicy.from_aws_managed_policy_name("AmazonAthenaFullAccess"),
+                iam.ManagedPolicy.from_aws_managed_policy_name("AWSLakeFormationDataAdmin")
+            ]
+        )
+        self.glue_crawler_role = self.builder.build_role(glue_crawler_role_config)
+        
+        # Roles para Step Functions
+        sf_role_config = RoleConfig(
+            role_name="stepfunctions-analytics-role",
+            assumed_by=iam.ServicePrincipal("states.amazonaws.com"),
+            inline_policies={
+                "StepFunctionPolicy": iam.PolicyDocument(
+                    statements=[
+                        iam.PolicyStatement(
+                            effect=iam.Effect.ALLOW,
+                            actions=[
+                                "glue:StartJobRun",
+                                "glue:GetJobRun",
+                                "glue:GetJobRuns",
+                                "glue:BatchStopJobRun",
+                                "glue:StartCrawler",
+                                "glue:GetCrawler",
+                                "glue:GetCrawlers",
+                                "glue:StopCrawler"
+                            ],
+                            resources=["*"]
+                        ),
+                        iam.PolicyStatement(
+                            effect=iam.Effect.ALLOW,
+                            actions=[
+                                "lambda:InvokeFunction"
+                            ],
+                            resources=["*"]
+                        ),
+                        iam.PolicyStatement(
+                            effect=iam.Effect.ALLOW,
+                            actions=[
+                                "states:StartExecution",
+                                "states:StopExecution",
+                                "states:DescribeExecution"
+                            ],
+                            resources=["*"]
+                        ),
+                        iam.PolicyStatement(
+                            effect=iam.Effect.ALLOW,
+                            actions=PolicyUtils.SNS_PUBLISH,
+                            resources=[
+                                self.sns_failed_topic.topic_arn,
+                                self.sns_success_topic.topic_arn
+                            ]
+                        )
+                    ]
+                )
+            }
+        )
+        self.step_function_role = self.builder.build_role(sf_role_config)
+        
+        # Role para Lambda functions
+        lambda_role_config = RoleConfig(
+            role_name="lambda-analytics-role",
+            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            managed_policies=[
+                iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole")
+            ],
+            inline_policies={
+                "GlueAccessPolicy": iam.PolicyDocument(
+                    statements=[
+                        iam.PolicyStatement(
+                            effect=iam.Effect.ALLOW,
+                            actions=[
+                                "glue:GetJobRuns",
+                                "glue:StartCrawler",
+                                "glue:GetCrawler",
+                                "glue:GetCrawlers",
+                                "glue:StopCrawler"
+                            ],
+                            resources=["*"]
+                        )
+                    ]
+                )
+            }
+        )
+        self.lambda_role = self.builder.build_role(lambda_role_config)
 
     def import_sns_topics(self):
         """Import an existing SNS topic"""
@@ -336,12 +398,12 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
             procedure_name = job_data['procedure']
             
             # Validar que el script existe
-            script_path = f"{self.Paths.AWS_ARTIFACTS_GLUE_CODE_ANALYTICS}/models/{layer}/{procedure_name}.py"
+            script_path = f"{self.Paths.AWS_ARTIFACTS_GLUE_CODE}/{layer}/{procedure_name}.py"
             
             try:
                 # Crear configuración del job
                 job_config = GlueJobConfig(
-                    job_name=f"{layer}-{procedure_name}",
+                    job_name=f"{self.BUSINESS_PROCESS}_{layer}_{procedure_name}",
                     executable=glue_alpha.JobExecutable.python_etl(  # ← glue_alpha para executable
                         glue_version=self._get_glue_version(job_data.get('glue_version', '4')),
                         python_version=glue_alpha.PythonVersion.THREE,
@@ -352,7 +414,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
                     ),
                     default_arguments={
                         **jobs_args,
-                        '--PROCESS_NAME': f"{self.PROJECT_CONFIG.enterprise}-{self.PROJECT_CONFIG.environment.value}-{self.PROJECT_CONFIG.project_name}-{layer}-{procedure_name}-job",
+                        '--PROCESS_NAME': f"{self.PROJECT_CONFIG.enterprise}-{self.PROJECT_CONFIG.environment.value.lower()}-{self.PROJECT_CONFIG.project_name}-{layer}-{procedure_name}-job",
                         '--FLOW_NAME': layer,
                         '--PERIODS': str(job_data.get('periods', 2))
                     },
@@ -373,7 +435,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
                 self.glue_jobs[layer][procedure_name] = glue_job
                 
                 # Crear target para crawler (ubicación S3 donde escribe el job)
-                s3_target_path = f"athenea/analytics/{layer}/{procedure_name}/"
+                s3_target_path = f"{self.TEAM}/{self.BUSINESS_PROCESS}/{layer}/{procedure_name}/"
                 self.cr_targets[layer].append(
                     aws_cdk.aws_glue.CfnCrawler.DeltaTargetProperty(  # ← glue (no glue_alpha) para CfnCrawler
                         create_native_delta_table=False,
@@ -469,13 +531,13 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         
         # Job para cargar datos finales a Redshift
         redshift_config = GlueJobConfig(
-            job_name="load_to_redshift",
+            job_name=f"{self.BUSINESS_PROCESS}_load_to_redshift",
             executable=glue_alpha.JobExecutable.python_etl(
                 glue_version=glue_alpha.GlueVersion.V4_0,
                 python_version=glue_alpha.PythonVersion.THREE,
                 script=glue_alpha.Code.from_bucket(
                     self.s3_artifacts_bucket,
-                    f"{self.Paths.AWS_ARTIFACTS_GLUE_CODE_ANALYTICS}/redshift/load_to_redshift.py"
+                    f"{self.Paths.AWS_ARTIFACTS_GLUE_CODE}/redshift/load_to_redshift.py"
                 )
             ),
             default_arguments=jobs_args,
@@ -491,13 +553,13 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         
         # Job para cargar datos de stage a Redshift
         stage_redshift_config = GlueJobConfig(
-            job_name="load_stage_to_redshift",
+            job_name=f"{self.BUSINESS_PROCESS}_load_stage_to_redshift",
             executable=glue_alpha.JobExecutable.python_etl(
                 glue_version=glue_alpha.GlueVersion.V4_0,
                 python_version=glue_alpha.PythonVersion.THREE,
                 script=glue_alpha.Code.from_bucket(
                     self.s3_artifacts_bucket,
-                    f"{self.Paths.AWS_ARTIFACTS_GLUE_CODE_ANALYTICS}/redshift/load_stage_to_redshift.py"
+                    f"{self.Paths.AWS_ARTIFACTS_GLUE_CODE}/redshift/load_stage_to_redshift.py"
                 )
             ),
             default_arguments=jobs_args,
@@ -522,7 +584,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
                 continue
                 
             # Crear database
-            database_name = f"athenea-{layer_key}-analytics-db"
+            database_name = f"{self.TEAM}_{self.BUSINESS_PROCESS}_{layer_key}"
             
             database = aws_cdk.aws_glue.CfnDatabase(  # ← glue (no glue_alpha)
                 self, f"Database{layer_key.title()}",
@@ -535,7 +597,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
             self.databases_layers[layer_key] = database
             
             # Crear crawler
-            crawler_name = f"{self.PROJECT_CONFIG.enterprise}-{self.PROJECT_CONFIG.environment.value}-{self.PROJECT_CONFIG.project_name}-{layer_key}-crawler"
+            crawler_name = f"{self.PROJECT_CONFIG.enterprise}-{self.PROJECT_CONFIG.environment.value.lower()}-{self.BUSINESS_PROCESS}-{self.PROJECT_CONFIG.project_name}-{layer_key}-crawler"
             
             crawler = aws_cdk.aws_glue.CfnCrawler(  # ← glue (no glue_alpha)
                 self, f"Crawler{layer_key.title()}",
@@ -609,13 +671,12 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         """Create state machines for each analytical layer"""
         
         # Obtener configuración de jobs por capa desde CSV
-        layer_jobs = self._load_jobs_configuration()
-        
+        layer_jobs = self._load_jobs_from_separate_files()
         # Crear máquina de estado para capa de dominio
         if 'domain' in layer_jobs:
             definition = self._build_layer_definition(
                     layer='dominio',
-                    jobs=layer_jobs['dominio'],
+                    jobs=layer_jobs['domain'],
                     crawler_name=self.crawler_dominio.crawler_name if hasattr(self, 'crawler_dominio') else None
                 )
             dominio_config = StepFunctionConfig(
@@ -628,7 +689,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         if 'analytics' in layer_jobs:
             definition = self._build_layer_definition(
                     layer='comercial',
-                    jobs=layer_jobs['comercial'],
+                    jobs=layer_jobs['analytics'],
                     crawler_name=self.crawler_comercial.crawler_name if hasattr(self, 'crawler_comercial') else None
                 )
             comercial_config = StepFunctionConfig(
@@ -857,28 +918,6 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         
         return definition
 
-    def _load_jobs_configuration(self) -> dict:
-        """Load Glue jobs configuration from CSV files"""
-        import pandas as pd
-        
-        jobs_by_layer = {}
-        
-        # Cargar configuración de dominio
-        try:
-            df_dominio = pd.read_csv(f"{self.Paths.LOCAL_ARTIFACTS_GLUE_CONFIG}/domain.csv", delimiter=';')
-            jobs_by_layer['dominio'] = self._process_jobs_config(df_dominio, 'dominio')
-        except FileNotFoundError:
-            logger.warning("Domain configuration file not found")
-        
-        # Cargar configuración comercial
-        try:
-            df_comercial = pd.read_csv(f"{self.Paths.LOCAL_ARTIFACTS_GLUE_CONFIG}/analytics.csv", delimiter=';')
-            jobs_by_layer['comercial'] = self._process_jobs_config(df_comercial, 'comercial')
-        except FileNotFoundError:
-            logger.warning("Analytics configuration file not found")
-        
-        return jobs_by_layer
-
     def _process_jobs_config(self, df: pd.DataFrame, layer: str) -> dict:
         """Process jobs configuration DataFrame into structured format"""
         jobs_by_order = {}
@@ -892,7 +931,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
                 jobs_by_order[order] = []
             
             # Construir nombre del job de Glue usando la convención
-            glue_job_name = f"{self.PROJECT_CONFIG.enterprise}-{self.PROJECT_CONFIG.environment.value}-{self.PROJECT_CONFIG.project_name}-{layer}-{row['procedure']}-job"
+            glue_job_name = f"{self.PROJECT_CONFIG.enterprise}-{self.PROJECT_CONFIG.environment.value}-{self.PROJECT_CONFIG.project_name}-{self.BUSINESS_PROCESS}_{layer}_{row['procedure']}-job"
             
             jobs_by_order[order].append({
                 'job_name': row['procedure'],
