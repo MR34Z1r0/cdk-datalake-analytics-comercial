@@ -129,7 +129,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         
         # Role para Glue Jobs
         glue_job_role_config = RoleConfig(
-            role_name="glue-analytics-job-role",
+            role_name="glue-analytics-job",
             assumed_by=iam.ServicePrincipal("glue.amazonaws.com"),
             managed_policies=[
                 iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AWSGlueServiceRole")
@@ -172,7 +172,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         
         # Role para Glue Crawler
         glue_crawler_role_config = RoleConfig(
-            role_name="glue-analytics-crawler-role",
+            role_name="glue-analytics-crawler",
             assumed_by=iam.ServicePrincipal("glue.amazonaws.com"),
             managed_policies=[
                 iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AWSGlueServiceRole"),
@@ -185,7 +185,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         
         # Roles para Step Functions
         sf_role_config = RoleConfig(
-            role_name="stepfunctions-analytics-role",
+            role_name="stepfunctions-analytics",
             assumed_by=iam.ServicePrincipal("states.amazonaws.com"),
             inline_policies={
                 "StepFunctionPolicy": iam.PolicyDocument(
@@ -236,7 +236,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         
         # Role para Lambda functions
         lambda_role_config = RoleConfig(
-            role_name="lambda-analytics-role",
+            role_name="lambda-analytics",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
             managed_policies=[
                 iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole")
