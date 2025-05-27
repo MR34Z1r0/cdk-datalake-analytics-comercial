@@ -12,7 +12,8 @@ from aws_cdk import (
     aws_secretsmanager as secretsmanager,
     aws_s3_notifications as s3n,
     aws_apigateway as apigw,
-    aws_glue_alpha as glue,
+    aws_glue_alpha as glue_alpha,
+    aws_glue as glue,
     aws_stepfunctions as sfn,
     aws_stepfunctions_tasks as tasks
 )
@@ -160,13 +161,13 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
 
             config = GlueJobConfig(
                 job_name=job_name,
-                executable=glue.JobExecutable.python_etl(
-                    glue_version=glue.GlueVersion.V5_0,
-                    python_version=glue.PythonVersion.THREE,
-                    script=glue.Code.from_bucket(self.s3_artifacts_bucket.bucket_name, f"{self.Paths.AWS_ARTIFACTS_GLUE_CODE_ANALYTICS}/{config['layer']}/{config['job_name']}.py")
+                executable=glue_alpha.JobExecutable.python_etl(
+                    glue_version=glue_alpha.GlueVersion.V5_0,
+                    python_version=glue_alpha.PythonVersion.THREE,
+                    script=glue_alpha.Code.from_bucket(self.s3_artifacts_bucket.bucket_name, f"{self.Paths.AWS_ARTIFACTS_GLUE_CODE_ANALYTICS}/{config['layer']}/{config['job_name']}.py")
                 ),
                 default_arguments=config["environment"],
-                continuous_logging=glue.ContinuousLoggingProps(enabled=True),
+                continuous_logging=glue_alpha.ContinuousLoggingProps(enabled=True),
                 timeout=Duration.minutes(60),
                 max_concurrent_runs=200
             )
@@ -327,7 +328,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         if layer not in self.state_machine_order_list:
             self.state_machine_order_list[layer] = {}
         
-        # Crear argumentos base para jobs (ahora incluye las relaciones procesadas)
+        # Crear argumentos base para jobs
         jobs_args = self._build_jobs_arguments()
         
         for job_data in jobs_config:
@@ -340,10 +341,10 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
                 # Crear configuración del job
                 job_config = GlueJobConfig(
                     job_name=f"{layer}-{procedure_name}",
-                    executable=glue.JobExecutable.python_etl(
+                    executable=glue_alpha.JobExecutable.python_etl(  # ← glue_alpha para executable
                         glue_version=self._get_glue_version(job_data.get('glue_version', '4')),
-                        python_version=glue.PythonVersion.THREE,
-                        script=glue.Code.from_bucket(
+                        python_version=glue_alpha.PythonVersion.THREE,
+                        script=glue_alpha.Code.from_bucket(
                             self.s3_artifacts_bucket, 
                             script_path
                         )
@@ -356,7 +357,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
                     },
                     worker_type=self._get_worker_type(job_data.get('worker_type', 'G.1X')),
                     worker_count=job_data.get('num_workers', 2),
-                    continuous_logging=glue.ContinuousLoggingProps(enabled=True),
+                    continuous_logging=glue_alpha.ContinuousLoggingProps(enabled=True),
                     timeout=Duration.hours(1),
                     max_concurrent_runs=100
                 )
@@ -373,7 +374,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
                 # Crear target para crawler (ubicación S3 donde escribe el job)
                 s3_target_path = f"athenea/analytics/{layer}/{procedure_name}/"
                 self.cr_targets[layer].append(
-                    glue.CfnCrawler.DeltaTargetProperty(
+                    glue.CfnCrawler.DeltaTargetProperty(  # ← glue (no glue_alpha) para CfnCrawler
                         create_native_delta_table=False,
                         delta_tables=[f"s3://{self.s3_analytics_bucket.bucket_name}/{s3_target_path}"],
                         write_manifest=True
@@ -522,7 +523,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
             # Crear database
             database_name = f"athenea-{layer_key}-analytics-db"
             
-            database = glue.CfnDatabase(
+            database = glue.CfnDatabase(  # ← glue (no glue_alpha)
                 self, f"Database{layer_key.title()}",
                 catalog_id=self.account,
                 database_input=glue.CfnDatabase.DatabaseInputProperty(
@@ -535,11 +536,11 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
             # Crear crawler
             crawler_name = f"{self.PROJECT_CONFIG.enterprise}-{self.PROJECT_CONFIG.environment.value}-{self.PROJECT_CONFIG.project_name}-{layer_key}-crawler"
             
-            crawler = glue.CfnCrawler(
+            crawler = glue.CfnCrawler(  # ← glue (no glue_alpha)
                 self, f"Crawler{layer_key.title()}",
                 name=crawler_name,
                 database_name=database_name,
-                role=self.glue_crawler_role.role_arn,  # Necesitas crear este rol
+                role=self.glue_crawler_role.role_arn,
                 targets=glue.CfnCrawler.TargetsProperty(delta_targets=targets),
                 schema_change_policy=glue.CfnCrawler.SchemaChangePolicyProperty(
                     update_behavior="UPDATE_IN_DATABASE",
@@ -552,24 +553,23 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
             logger.info(f"Created database and crawler for layer: {layer_key}")
 
     # Métodos auxiliares que ya tienes
-    def _get_glue_version(self, version_str: str) -> glue.GlueVersion:
+    def _get_glue_version(self, version_str: str) -> glue_alpha.GlueVersion:
         """Convert version string to GlueVersion enum"""
         version_map = {
-            '3': glue.GlueVersion.V3_0,
-            '4': glue.GlueVersion.V4_0,
-            '5': glue.GlueVersion.V5_0
+            '3': glue_alpha.GlueVersion.V3_0,
+            '4': glue_alpha.GlueVersion.V4_0,
+            '5': glue_alpha.GlueVersion.V4_0
         }
-        return version_map.get(str(version_str), glue.GlueVersion.V4_0)
+        return version_map.get(str(version_str), glue_alpha.GlueVersion.V4_0)
 
-    def _get_worker_type(self, worker_str: str) -> glue.WorkerType:
+    def _get_worker_type(self, worker_str: str) -> glue_alpha.WorkerType:
         """Convert worker string to WorkerType enum"""
         worker_map = {
-            'G.1X': glue.WorkerType.G_1_X,
-            'G.2X': glue.WorkerType.G_2_X,
-            'G.4X': glue.WorkerType.G_4_X,
-            'G.8X': glue.WorkerType.G_8_X
+            'G.1X': glue_alpha.WorkerType.G_1_X,
+            'G.2X': glue_alpha.WorkerType.G_2_X,
+            # Nota: G_4_X y G_8_X no existen en aws-glue-alpha
         }
-        return worker_map.get(worker_str, glue.WorkerType.G_1_X)
+        return worker_map.get(worker_str, glue_alpha.WorkerType.G_1_X)
 
     def create_step_functions(self):
         """Create Step Function definitions for the Datalake Analytics Commercial workflow"""
@@ -613,7 +613,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
             dominio_config = StepFunctionConfig(
                 name=f"{self.BUSINESS_PROCESS}_analytics_domain",
                 definition=self._build_layer_definition(
-                    layer='domain',
+                    layer='dominio',
                     jobs=layer_jobs['dominio'],
                     crawler_name=self.crawler_dominio.crawler_name if hasattr(self, 'crawler_dominio') else None
                 )
