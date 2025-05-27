@@ -17,6 +17,7 @@ from aws_cdk import (
     aws_stepfunctions as sfn,
     aws_stepfunctions_tasks as tasks
 )
+import aws_cdk
 from constructs import Construct
 from aje_cdk_libs.builders.resource_builder import ResourceBuilder
 from aje_cdk_libs.models.configs import *
@@ -374,7 +375,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
                 # Crear target para crawler (ubicación S3 donde escribe el job)
                 s3_target_path = f"athenea/analytics/{layer}/{procedure_name}/"
                 self.cr_targets[layer].append(
-                    glue.CfnCrawler.DeltaTargetProperty(  # ← glue (no glue_alpha) para CfnCrawler
+                    aws_cdk.aws_glue.CfnCrawler.DeltaTargetProperty(  # ← glue (no glue_alpha) para CfnCrawler
                         create_native_delta_table=False,
                         delta_tables=[f"s3://{self.s3_analytics_bucket.bucket_name}/{s3_target_path}"],
                         write_manifest=True
@@ -469,19 +470,19 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         # Job para cargar datos finales a Redshift
         redshift_config = GlueJobConfig(
             job_name="load_to_redshift",
-            executable=glue.JobExecutable.python_etl(
-                glue_version=glue.GlueVersion.V4_0,
-                python_version=glue.PythonVersion.THREE,
-                script=glue.Code.from_bucket(
+            executable=glue_alpha.JobExecutable.python_etl(
+                glue_version=glue_alpha.GlueVersion.V4_0,
+                python_version=glue_alpha.PythonVersion.THREE,
+                script=glue_alpha.Code.from_bucket(
                     self.s3_artifacts_bucket,
                     f"{self.Paths.AWS_ARTIFACTS_GLUE_CODE_ANALYTICS}/redshift/load_to_redshift.py"
                 )
             ),
             default_arguments=jobs_args,
-            worker_type=glue.WorkerType.G_1_X,
+            worker_type=glue_alpha.WorkerType.G_1_X,
             worker_count=2,
             connections=[self.glue_redshift_connection] if hasattr(self, 'glue_redshift_connection') else [],
-            continuous_logging=glue.ContinuousLoggingProps(enabled=True),
+            continuous_logging=glue_alpha.ContinuousLoggingProps(enabled=True),
             timeout=Duration.hours(2),
             max_concurrent_runs=10
         )
@@ -491,19 +492,19 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         # Job para cargar datos de stage a Redshift
         stage_redshift_config = GlueJobConfig(
             job_name="load_stage_to_redshift",
-            executable=glue.JobExecutable.python_etl(
-                glue_version=glue.GlueVersion.V4_0,
-                python_version=glue.PythonVersion.THREE,
-                script=glue.Code.from_bucket(
+            executable=glue_alpha.JobExecutable.python_etl(
+                glue_version=glue_alpha.GlueVersion.V4_0,
+                python_version=glue_alpha.PythonVersion.THREE,
+                script=glue_alpha.Code.from_bucket(
                     self.s3_artifacts_bucket,
                     f"{self.Paths.AWS_ARTIFACTS_GLUE_CODE_ANALYTICS}/redshift/load_stage_to_redshift.py"
                 )
             ),
             default_arguments=jobs_args,
-            worker_type=glue.WorkerType.G_1_X,
+            worker_type=glue_alpha.WorkerType.G_1_X,
             worker_count=2,
             connections=[self.glue_redshift_connection] if hasattr(self, 'glue_redshift_connection') else [],
-            continuous_logging=glue.ContinuousLoggingProps(enabled=True),
+            continuous_logging=glue_alpha.ContinuousLoggingProps(enabled=True),
             timeout=Duration.hours(2),
             max_concurrent_runs=10
         )
@@ -523,10 +524,10 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
             # Crear database
             database_name = f"athenea-{layer_key}-analytics-db"
             
-            database = glue.CfnDatabase(  # ← glue (no glue_alpha)
+            database = aws_cdk.aws_glue.CfnDatabase(  # ← glue (no glue_alpha)
                 self, f"Database{layer_key.title()}",
                 catalog_id=self.account,
-                database_input=glue.CfnDatabase.DatabaseInputProperty(
+                database_input=aws_cdk.aws_glue.CfnDatabase.DatabaseInputProperty(
                     name=database_name
                 )
             )
@@ -536,13 +537,13 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
             # Crear crawler
             crawler_name = f"{self.PROJECT_CONFIG.enterprise}-{self.PROJECT_CONFIG.environment.value}-{self.PROJECT_CONFIG.project_name}-{layer_key}-crawler"
             
-            crawler = glue.CfnCrawler(  # ← glue (no glue_alpha)
+            crawler = aws_cdk.aws_glue.CfnCrawler(  # ← glue (no glue_alpha)
                 self, f"Crawler{layer_key.title()}",
                 name=crawler_name,
                 database_name=database_name,
                 role=self.glue_crawler_role.role_arn,
-                targets=glue.CfnCrawler.TargetsProperty(delta_targets=targets),
-                schema_change_policy=glue.CfnCrawler.SchemaChangePolicyProperty(
+                targets=aws_cdk.aws_glue.CfnCrawler.TargetsProperty(delta_targets=targets),
+                schema_change_policy=aws_cdk.aws_glue.CfnCrawler.SchemaChangePolicyProperty(
                     update_behavior="UPDATE_IN_DATABASE",
                     delete_behavior="DEPRECATE_IN_DATABASE"
                 )
@@ -589,7 +590,8 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         # Configuración base para máquinas de estado
         base_config = StepFunctionConfig(
             name=f"{self.BUSINESS_PROCESS}_analytics_base",
-            definition=self._build_base_definition()
+            definition_body=sfn.DefinitionBody.from_chainable(self._build_base_definition())
+            #definition=self._build_base_definition()
         )
         
         self.state_machine_base = self.builder.build_step_function(base_config)
@@ -597,7 +599,8 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         # Máquina de estado específica para Redshift
         redshift_config = StepFunctionConfig(
             name=f"{self.BUSINESS_PROCESS}_analytics_base_redshift", 
-            definition=self._build_redshift_base_definition()
+            definition_body=sfn.DefinitionBody.from_chainable(self._build_redshift_base_definition())
+            #definition=self._build_redshift_base_definition()
         )
         
         self.state_machine_base_redshift = self.builder.build_step_function(redshift_config)
@@ -610,25 +613,27 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         
         # Crear máquina de estado para capa de dominio
         if 'domain' in layer_jobs:
-            dominio_config = StepFunctionConfig(
-                name=f"{self.BUSINESS_PROCESS}_analytics_domain",
-                definition=self._build_layer_definition(
+            definition = self._build_layer_definition(
                     layer='dominio',
                     jobs=layer_jobs['dominio'],
                     crawler_name=self.crawler_dominio.crawler_name if hasattr(self, 'crawler_dominio') else None
                 )
+            dominio_config = StepFunctionConfig(
+                name=f"{self.BUSINESS_PROCESS}_analytics_domain",                
+                definition_body=sfn.DefinitionBody.from_chainable(definition)
             )
             self.state_machine_domain = self.builder.build_step_function(dominio_config)
         
         # Crear máquina de estado para capa comercial
         if 'analytics' in layer_jobs:
-            comercial_config = StepFunctionConfig(
-                name=f"{self.BUSINESS_PROCESS}_analytics_analytics", 
-                definition=self._build_layer_definition(
+            definition = self._build_layer_definition(
                     layer='comercial',
                     jobs=layer_jobs['comercial'],
                     crawler_name=self.crawler_comercial.crawler_name if hasattr(self, 'crawler_comercial') else None
                 )
+            comercial_config = StepFunctionConfig(
+                name=f"{self.BUSINESS_PROCESS}_analytics_analytics",                 
+                definition_body=sfn.DefinitionBody.from_chainable(definition)
             )
             self.state_machine_analytics = self.builder.build_step_function(comercial_config)
 
@@ -637,7 +642,7 @@ class CdkDatalakeAnaliticsComercialStack(Stack):
         
         orchestration_config = StepFunctionConfig(
             name=f"{self.BUSINESS_PROCESS}_analytics_orchestrate",
-            definition=self._build_orchestration_definition()
+            definition_body=sfn.DefinitionBody.from_chainable(self._build_orchestration_definition())
         )
         
         self.state_machine_analytics = self.builder.build_step_function(orchestration_config)
