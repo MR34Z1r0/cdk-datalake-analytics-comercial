@@ -460,7 +460,7 @@ class CdkDatalakeAnalyticsStack(Stack):
                 self._add_to_execution_order(layer, job_data, glue_job.job_name)
                 
             logger.info(f"Created Glue job: {glue_job.job_name}")
-            
+
     def _add_to_execution_order(self, layer: str, job_data: dict, job_name: str):
         """Agregar job al orden de ejecución de Step Functions"""
         
@@ -475,7 +475,7 @@ class CdkDatalakeAnalyticsStack(Stack):
             'process_id': str(job_data.get('process_id', '10')),
             'job_name': job_name
         })
-        
+
     def _create_glue_databases_and_crawlers(self):
         """Crear bases de datos y crawlers de Glue"""
         
@@ -516,7 +516,7 @@ class CdkDatalakeAnalyticsStack(Stack):
             
             self.builder.tag_resource(database, f"database-{layer_key}", "AWS Glue")
             self.builder.tag_resource(crawler, f"crawler-{layer_key}", "AWS Glue")
-            
+
     def _create_step_functions(self):
         """Crear Step Functions usando aje-cdk-libs"""
         
@@ -538,6 +538,8 @@ class CdkDatalakeAnalyticsStack(Stack):
         print(f"Relation Process: {self.relation_process}")
         print(f"Databases Layers: {self.databases_layers}")
         print(f"Crawlers Layers: {self.cr_targets}")
+
+        self._build_layer_state_machine('domain', self.crawlers_layers['domain'])
 
         ## State Machines por capa
         #for layer in self.state_machine_order_list.keys():
@@ -717,6 +719,23 @@ class CdkDatalakeAnalyticsStack(Stack):
             current_state.next(crawler_task)
             
         return initial_state or sfn.Succeed(self, f"NoJobs{layer.title()}")
+
+    def _build_layer_state_machine(self, layer: str, crawler: cdk.aws_glue.CfnCrawler = None):
+        """Crear Step Function para una capa específica"""
+        layer_definition = self._build_layer_state_machine_definition(layer, crawler.name)
+        layer_config = StepFunctionConfig(
+            name=f"{self.PROJECT_CONFIG.app_config.get("business_process")}_analytics_{layer}",
+            definition_body=sfn.DefinitionBody.from_chainable(layer_definition),
+            role=self.step_function_role
+        )
+        
+        layer_sm = self.builder.build_step_function(
+            layer_config
+        )
+
+        setattr(self, f'state_machine_{layer}', layer_sm)
+        
+        return layer_sm
 
     def _build_orchestration_definition(self):
         """Construir definición de orquestación principal"""
