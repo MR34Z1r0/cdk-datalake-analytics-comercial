@@ -8,19 +8,19 @@ try:
     periodos= spark_controller.get_periods()
     logger.info(periodos)
 
-    m_compania = spark_controller.read_table(data_paths.BIG_BAGIC, "m_compania", cod_pais=cod_pais)
-    m_pais = spark_controller.read_table(data_paths.BIG_BAGIC, "m_pais", cod_pais=cod_pais)
-    m_articulo = spark_controller.read_table(data_paths.BIG_BAGIC, "m_articulo", cod_pais=cod_pais)
-    m_moneda = spark_controller.read_table(data_paths.BIG_BAGIC, "m_moneda", cod_pais=cod_pais)
-    m_tipo_cambio = spark_controller.read_table(data_paths.BIG_BAGIC, "m_tipo_cambio", cod_pais=cod_pais)
-    m_lista_precio_costo_estandard = spark_controller.read_table(data_paths.BIG_BAGIC, "m_lista_precio_costo_estandard", cod_pais=cod_pais)
-    m_lista_precio_costo_estandar_detalle = spark_controller.read_table(data_paths.BIG_BAGIC, "m_lista_precio_costo_estandar_detalle", cod_pais=cod_pais)
-    t_hoja_costos_cabecera = spark_controller.read_table(data_paths.BIG_BAGIC, "t_hoja_costos_cabecera", cod_pais=cod_pais)
+    m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
+    m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais)
+    m_articulo = spark_controller.read_table(data_paths.BIG_MAGIC, "m_articulo", cod_pais=cod_pais)
+    m_moneda = spark_controller.read_table(data_paths.BIG_MAGIC, "m_moneda", cod_pais=cod_pais)
+    m_tipo_cambio = spark_controller.read_table(data_paths.BIG_MAGIC, "m_tipo_cambio", cod_pais=cod_pais)
+    m_lista_precio_costo_estandard = spark_controller.read_table(data_paths.BIG_MAGIC, "m_lista_precio_costo_estandard", cod_pais=cod_pais)
+    m_lista_precio_costo_estandar_detalle = spark_controller.read_table(data_paths.BIG_MAGIC, "m_lista_precio_costo_estandar_detalle", cod_pais=cod_pais)
+    t_hoja_costos_cabecera = spark_controller.read_table(data_paths.BIG_MAGIC, "t_hoja_costos_cabecera", cod_pais=cod_pais)
 
     m_categoria_compra_dom = spark_controller.read_table(data_paths.DOMINIO, "m_categoria_compra").where(col("id_pais").isin(cod_pais))
-    t_orden_produccion_cabecera = spark_controller.read_table(data_paths.BIG_BAGIC, "t_orden_produccion_cabecera", cod_pais=cod_pais)
-    m_turno = spark_controller.read_table(data_paths.BIG_BAGIC, "m_turno", cod_pais=cod_pais)
-    m_equipo_insumo = spark_controller.read_table(data_paths.BIG_BAGIC, "m_equipo_insumo", cod_pais=cod_pais)
+    t_orden_produccion_cabecera = spark_controller.read_table(data_paths.BIG_MAGIC, "t_orden_produccion_cabecera", cod_pais=cod_pais)
+    m_turno = spark_controller.read_table(data_paths.BIG_MAGIC, "m_turno", cod_pais=cod_pais)
+    m_equipo_insumo = spark_controller.read_table(data_paths.BIG_MAGIC, "m_equipo_insumo", cod_pais=cod_pais)
 
 
     target_table_name = "t_hoja_costos_cabecera"

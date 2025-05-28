@@ -7,10 +7,10 @@ spark_controller = SPARK_CONTROLLER()
 try:
     cod_pais = COD_PAIS.split(",") 
     df_m_documento_transaccion = spark_controller.read_table(
-        data_paths.BIG_BAGIC, "m_documento_transaccion", cod_pais=cod_pais
+        data_paths.BIG_MAGIC, "m_documento_transaccion", cod_pais=cod_pais
     )
-    df_m_pais = spark_controller.read_table(data_paths.BIG_BAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
-    df_m_compania = spark_controller.read_table(data_paths.BIG_BAGIC, "m_compania", cod_pais=cod_pais)
+    df_m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
+    df_m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
  
     target_table_name = "m_tipo_pedido"
 except Exception as e:

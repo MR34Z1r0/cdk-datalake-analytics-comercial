@@ -8,14 +8,14 @@ try:
     periodos= spark_controller.get_periods()
     logger.info(periodos)
 
-    m_compania = spark_controller.read_table(data_paths.BIG_BAGIC, "m_compania", cod_pais=cod_pais)
-    m_pais = spark_controller.read_table(data_paths.BIG_BAGIC, "m_pais", cod_pais=cod_pais, have_principal=True)
-    m_articulo = spark_controller.read_table(data_paths.BIG_BAGIC, "m_articulo", cod_pais=cod_pais)
-    t_orden_produccion_cabecera = spark_controller.read_table(data_paths.BIG_BAGIC, "t_orden_produccion_cabecera", cod_pais=cod_pais)
-    t_tiempo_produccion_vs_parada_detalle = spark_controller.read_table(data_paths.BIG_BAGIC, "t_tiempo_produccion_vs_parada_detalle", cod_pais=cod_pais)
-    t_tiempo_produccion_vs_parada_cabecera = spark_controller.read_table(data_paths.BIG_BAGIC, "t_tiempo_produccion_vs_parada_cabecera", cod_pais=cod_pais)
-    m_equipo_insumo = spark_controller.read_table(data_paths.BIG_BAGIC, "m_equipo_insumo", cod_pais=cod_pais)
-    m_turno = spark_controller.read_table(data_paths.BIG_BAGIC, "m_turno", cod_pais=cod_pais)
+    m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
+    m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais, have_principal=True)
+    m_articulo = spark_controller.read_table(data_paths.BIG_MAGIC, "m_articulo", cod_pais=cod_pais)
+    t_orden_produccion_cabecera = spark_controller.read_table(data_paths.BIG_MAGIC, "t_orden_produccion_cabecera", cod_pais=cod_pais)
+    t_tiempo_produccion_vs_parada_detalle = spark_controller.read_table(data_paths.BIG_MAGIC, "t_tiempo_produccion_vs_parada_detalle", cod_pais=cod_pais)
+    t_tiempo_produccion_vs_parada_cabecera = spark_controller.read_table(data_paths.BIG_MAGIC, "t_tiempo_produccion_vs_parada_cabecera", cod_pais=cod_pais)
+    m_equipo_insumo = spark_controller.read_table(data_paths.BIG_MAGIC, "m_equipo_insumo", cod_pais=cod_pais)
+    m_turno = spark_controller.read_table(data_paths.BIG_MAGIC, "m_turno", cod_pais=cod_pais)
 
     target_table_name = "t_orden_produccion"
 

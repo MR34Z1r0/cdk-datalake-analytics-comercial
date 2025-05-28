@@ -22,7 +22,7 @@ try:
     ])
 
     t_compras_rendimiento = spark_controller.read_table(data_paths.EXTERNAL, "cadena/global/compras_rendimiento", schema=schema_t_compra_rendimiento)
-    m_pais = spark_controller.read_table(data_paths.BIG_BAGIC, "m_pais", cod_pais=cod_pais, have_principal=True)
+    m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais, have_principal=True)
 
     target_table_name = "t_compra_rendimiento"
 

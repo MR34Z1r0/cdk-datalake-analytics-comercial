@@ -9,15 +9,15 @@ try:
     periodos= spark_controller.get_periods()
     logger.info(periodos)
 
-    m_compania = spark_controller.read_table(data_paths.BIG_BAGIC, "m_compania", cod_pais=cod_pais)
-    m_pais = spark_controller.read_table(data_paths.BIG_BAGIC, "m_pais", cod_pais=cod_pais, have_principal=True)
-    m_parametro = spark_controller.read_table(data_paths.BIG_BAGIC, "m_parametro", cod_pais=cod_pais, have_principal=True)
-    m_articulo = spark_controller.read_table(data_paths.BIG_BAGIC, "m_articulo", cod_pais=cod_pais, have_principal=True)
-    m_tipo_cambio = spark_controller.read_table(data_paths.BIG_BAGIC, "m_tipo_cambio", cod_pais=cod_pais, have_principal=True)
-    m_empleado = spark_controller.read_table(data_paths.BIG_BAGIC, "m_empleado", cod_pais=cod_pais, have_principal=True)
-    t_toma_inventario = spark_controller.read_table(data_paths.BIG_BAGIC, "t_toma_inventario", cod_pais=cod_pais, have_principal=True)
-    t_toma_inventario_detalle = spark_controller.read_table(data_paths.BIG_BAGIC, "t_toma_inventario_detalle", cod_pais=cod_pais, have_principal=True)
-    t_cierre_inventario_cpm = spark_controller.read_table(data_paths.BIG_BAGIC, "t_cierre_inventario_cpm", cod_pais=cod_pais, have_principal=True)
+    m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
+    m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais, have_principal=True)
+    m_parametro = spark_controller.read_table(data_paths.BIG_MAGIC, "m_parametro", cod_pais=cod_pais, have_principal=True)
+    m_articulo = spark_controller.read_table(data_paths.BIG_MAGIC, "m_articulo", cod_pais=cod_pais, have_principal=True)
+    m_tipo_cambio = spark_controller.read_table(data_paths.BIG_MAGIC, "m_tipo_cambio", cod_pais=cod_pais, have_principal=True)
+    m_empleado = spark_controller.read_table(data_paths.BIG_MAGIC, "m_empleado", cod_pais=cod_pais, have_principal=True)
+    t_toma_inventario = spark_controller.read_table(data_paths.BIG_MAGIC, "t_toma_inventario", cod_pais=cod_pais, have_principal=True)
+    t_toma_inventario_detalle = spark_controller.read_table(data_paths.BIG_MAGIC, "t_toma_inventario_detalle", cod_pais=cod_pais, have_principal=True)
+    t_cierre_inventario_cpm = spark_controller.read_table(data_paths.BIG_MAGIC, "t_cierre_inventario_cpm", cod_pais=cod_pais, have_principal=True)
 
     target_table_name = "t_saldos_iniciales"
 

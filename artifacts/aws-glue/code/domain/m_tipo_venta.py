@@ -7,11 +7,11 @@ spark_controller = SPARK_CONTROLLER()
 try:
     cod_pais = COD_PAIS.split(",")
  
-    df_m_tipo_documento = spark_controller.read_table(data_paths.BIG_BAGIC, "m_tipo_documento", cod_pais=cod_pais)
-    df_m_procedimiento = spark_controller.read_table(data_paths.BIG_BAGIC, "m_procedimiento", cod_pais=cod_pais)
-    df_m_tipo_transaccion = spark_controller.read_table(data_paths.BIG_BAGIC, "m_tipo_transaccion", cod_pais=cod_pais)
-    df_m_pais = spark_controller.read_table(data_paths.BIG_BAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
-    df_m_compania = spark_controller.read_table(data_paths.BIG_BAGIC, "m_compania", cod_pais=cod_pais)
+    df_m_tipo_documento = spark_controller.read_table(data_paths.BIG_MAGIC, "m_tipo_documento", cod_pais=cod_pais)
+    df_m_procedimiento = spark_controller.read_table(data_paths.BIG_MAGIC, "m_procedimiento", cod_pais=cod_pais)
+    df_m_tipo_transaccion = spark_controller.read_table(data_paths.BIG_MAGIC, "m_tipo_transaccion", cod_pais=cod_pais)
+    df_m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
+    df_m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
  
     target_table_name = "m_tipo_venta"
 

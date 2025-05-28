@@ -5,9 +5,9 @@ spark_controller = SPARK_CONTROLLER()
 target_table_name = "m_almacen"
 try:
     cod_pais = COD_PAIS.split(",")
-    df_m_compania = spark_controller.read_table(data_paths.BIG_BAGIC, "m_compania", cod_pais=cod_pais)
-    df_m_pais = spark_controller.read_table(data_paths.BIG_BAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
-    df_m_almacen = spark_controller.read_table(data_paths.BIG_BAGIC, "m_almacen", cod_pais=cod_pais)
+    df_m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
+    df_m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
+    df_m_almacen = spark_controller.read_table(data_paths.BIG_MAGIC, "m_almacen", cod_pais=cod_pais)
 except Exception as e:
     logger.error(e)
     raise

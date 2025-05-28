@@ -14,7 +14,7 @@ from delta.tables import DeltaTable
 from pyspark.sql.functions import col
 
 logging.basicConfig(format="%(asctime)s %(name)s %(levelname)s %(message)s")
-logger = logging.getLogger("datalake-aje-cadena-analytics")
+logger = logging.getLogger(__name__)
 logger.setLevel(os.environ.get("LOGGING", logging.INFO))
 
 args = getResolvedOptions(
@@ -25,6 +25,8 @@ args = getResolvedOptions(
         "S3_PATH_EXTERNAL",
         "S3_PATH_ARTIFACTS",
         "S3_PATH_ARTIFACTS_CSV",
+        "TEAM",
+        "BUSINESS_PROCESS",
         "REGION_NAME",
         "DYNAMODB_DATABASE_NAME",
         "INSTANCIAS",
@@ -43,6 +45,8 @@ S3_PATH_ANALYTICS = args["S3_PATH_ANALYTICS"]
 S3_PATH_EXTERNAL = args["S3_PATH_EXTERNAL"]
 S3_PATH_ARTIFACTS = args["S3_PATH_ARTIFACTS"]
 S3_PATH_ARTIFACTS_CSV = args["S3_PATH_ARTIFACTS_CSV"]
+TEAM = args["TEAM"]
+BUSINESS_PROCESS = args["BUSINESS_PROCESS"]
 REGION_NAME = args["REGION_NAME"]
 DYNAMODB_DATABASE_NAME = args["DYNAMODB_DATABASE_NAME"]
 INSTANCIAS = args["INSTANCIAS"]
@@ -68,33 +72,19 @@ dynamodb_resource = boto3.resource('dynamodb')
 dynamodb_client = boto3.client('dynamodb')
 
 class data_paths:
-    CADENA = f"{S3_PATH_ANALYTICS}cadena/"
-    COMERCIAL = f"{S3_PATH_ANALYTICS}comercial/"
-    DOMINIO = f"{S3_PATH_ANALYTICS}dominio/"
-    DOMINIO_ECONORED = f"{S3_PATH_ANALYTICS}dominio_econored/"
-    COMERCIAL_ECONORED = f"{S3_PATH_ANALYTICS}comercial_econored/"
-    BACKOFFICE = f"{S3_PATH_ANALYTICS}backoffice/"
-    BIG_BAGIC = f"{S3_PATH_STG}sqlserver/"
-    SALESFORCE = f"{S3_PATH_STG}salesforce/public/"
+    ANALYTICS = f"{S3_PATH_ANALYTICS}{BUSINESS_PROCESS}/analytics/"
+    DOMAIN = f"{S3_PATH_ANALYTICS}{BUSINESS_PROCESS}/domain/"
+    BIG_MAGIC = f"{S3_PATH_STG}apdayc/"
     EXTERNAL = f"{S3_PATH_EXTERNAL}"
     ARTIFACTS_CSV = f"{S3_PATH_ARTIFACTS_CSV}"
     
     def getDataPath(self, layer):
-        if layer.upper() == "CADENA":
-            return self.CADENA
-        elif layer.upper() == "COMERCIAL":
-            return self.COMERCIAL
-        elif layer.upper() == "DOMINIO":
-            return self.DOMINIO
-        elif layer.upper() == "DOMINIO_ECONORED":
-            return self.DOMINIO_ECONORED
-        elif layer.upper() == "COMERCIAL_ECONORED":
-            return self.COMERCIAL_ECONORED
-        elif layer.upper() == "BACKOFFICE":
-            return self.BACKOFFICE
+        if layer.upper() == "ANALYTICS":
+            return self.ANALYTICS
+        elif layer.upper() == "DOMAIN":
+            return self.DOMAIN
         else:
             raise ValueError(f"Layer {layer} not found")
-
 
 class STATUS:
     IN_PROGRESS = 0
@@ -193,7 +183,6 @@ class SPARK_CONTROLLER():
             logger.error(f"Source table cannot be read {table_name}")
             # self.logger.send_error_message(ERROR_TOPIC_ARN,f"Reading table {table_name}", str(e))
             raise e
-        
 
     def write_table(self, df, path, table_name, partition_by : list = []):
         try:
@@ -472,7 +461,6 @@ class SPARK_CONTROLLER():
         except Exception as e:
             logger.error(f"Failed to write to Redshift: {str(e)}")
             self.logger.send_error_message(ERROR_TOPIC_ARN,f"Failed to write to Redshift", str(e))
-            
 
 class LOGGING_UTILS():
     def send_error_redshift_message(self, topic_arn, table_name, error):
@@ -554,7 +542,6 @@ class LOGGING_UTILS():
 
         
         self.update_attribute_value_dynamodb('TARGET_TABLE_NAME', table_name, 'FAIL REASON', message, config_table_name)
-
   
     def upload_log(log_table_name : str, target_table_name : str, type : str, message : str, load_type : str, date_time = "", service : str = "GLUE", service_specification : str = "", pipeline_id : str = ""):
         dynamodb = boto3.resource('dynamodb')

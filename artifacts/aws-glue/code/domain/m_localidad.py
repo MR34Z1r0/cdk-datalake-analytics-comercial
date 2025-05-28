@@ -8,15 +8,15 @@ try:
     cod_pais = COD_PAIS.split(",")
 
     # Load Stage
-    m_pais = spark_controller.read_table(data_paths.BIG_BAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
-    m_compania = spark_controller.read_table(data_paths.BIG_BAGIC, "m_compania", cod_pais=cod_pais)
-    m_almacen = spark_controller.read_table(data_paths.BIG_BAGIC, "m_almacen", cod_pais=cod_pais)
-    m_canal_visibilidad = spark_controller.read_table(data_paths.BIG_BAGIC, "m_canal", cod_pais=cod_pais)
-    m_cliente = spark_controller.read_table(data_paths.BIG_BAGIC, "m_cliente", cod_pais=cod_pais)
-    m_departamento = spark_controller.read_table(data_paths.BIG_BAGIC, "m_ng1", cod_pais=cod_pais)
-    m_persona = spark_controller.read_table(data_paths.BIG_BAGIC, "m_persona", cod_pais=cod_pais)
-    m_persona_direccion = spark_controller.read_table(data_paths.BIG_BAGIC, "m_persona_direccion", cod_pais=cod_pais)
-    m_provincia = spark_controller.read_table(data_paths.BIG_BAGIC, "m_ng2", cod_pais=cod_pais)
+    m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
+    m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
+    m_almacen = spark_controller.read_table(data_paths.BIG_MAGIC, "m_almacen", cod_pais=cod_pais)
+    m_canal_visibilidad = spark_controller.read_table(data_paths.BIG_MAGIC, "m_canal", cod_pais=cod_pais)
+    m_cliente = spark_controller.read_table(data_paths.BIG_MAGIC, "m_cliente", cod_pais=cod_pais)
+    m_departamento = spark_controller.read_table(data_paths.BIG_MAGIC, "m_ng1", cod_pais=cod_pais)
+    m_persona = spark_controller.read_table(data_paths.BIG_MAGIC, "m_persona", cod_pais=cod_pais)
+    m_persona_direccion = spark_controller.read_table(data_paths.BIG_MAGIC, "m_persona_direccion", cod_pais=cod_pais)
+    m_provincia = spark_controller.read_table(data_paths.BIG_MAGIC, "m_ng2", cod_pais=cod_pais)
 
     target_table_name = "m_localidad"
 

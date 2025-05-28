@@ -162,29 +162,19 @@ class CdkDatalakeAnalyticsStack(Stack):
                     statements=[
                         iam.PolicyStatement(
                             effect=iam.Effect.ALLOW,
-                            actions=[
-                                "glue:StartJobRun",
-                                "glue:GetJobRun", 
-                                "glue:GetJobRuns",
-                                "glue:BatchStopJobRun",
-                                "glue:StartCrawler",
-                                "glue:GetCrawler",
-                                "glue:StopCrawler"
-                            ],
+                            actions=PolicyUtils.join_permissions(
+                                PolicyUtils.GLUE_START_JOB, 
+                                PolicyUtils.CRAWLER_START_JOB),
                             resources=["*"]
                         ),
                         iam.PolicyStatement(
                             effect=iam.Effect.ALLOW,
-                            actions=["lambda:InvokeFunction"],
+                            actions=PolicyUtils.LAMBDA_INVOKE,
                             resources=["*"]
                         ),
                         iam.PolicyStatement(
                             effect=iam.Effect.ALLOW,
-                            actions=[
-                                "states:StartExecution",
-                                "states:StopExecution",
-                                "states:DescribeExecution"
-                            ],
+                            actions=PolicyUtils.STEP_FUNCTIONS_START_EXECUTION,
                             resources=["*"]
                         ),
                         iam.PolicyStatement(
@@ -213,12 +203,9 @@ class CdkDatalakeAnalyticsStack(Stack):
                     statements=[
                         iam.PolicyStatement(
                             effect=iam.Effect.ALLOW,
-                            actions=[
-                                "glue:GetJobRuns",
-                                "glue:StartCrawler",
-                                "glue:GetCrawler",
-                                "glue:StopCrawler"
-                            ],
+                            actions=PolicyUtils.join_permissions(
+                                PolicyUtils.GLUE_START_JOB, 
+                                PolicyUtils.CRAWLER_START_JOB),
                             resources=["*"]
                         )
                     ]
@@ -393,6 +380,8 @@ class CdkDatalakeAnalyticsStack(Stack):
             '--S3_PATH_EXTERNAL': f"s3a://{self.s3_external_bucket.bucket_name}/{self.PROJECT_CONFIG.app_config['team']}/",
             '--S3_PATH_ARTIFACTS': f"s3a://{self.s3_artifacts_bucket.bucket_name}/{self.Paths.AWS_ARTIFACTS_GLUE}/",
             '--S3_PATH_ARTIFACTS_CSV': f"s3a://{self.s3_artifacts_bucket.bucket_name}/{self.Paths.AWS_ARTIFACTS_GLUE_CSV}",
+            '--TEAM': self.PROJECT_CONFIG.app_config['team'],
+            '--BUSINESS_PROCESS': self.PROJECT_CONFIG.app_config['business_process'],
             '--REGION_NAME': self.PROJECT_CONFIG.region_name,
             '--DYNAMODB_DATABASE_NAME': self.dynamodb_credentials_table.table_name,
             '--DYNAMODB_LOGS_TABLE': self.dynamodb_logs_table.table_name,
@@ -534,42 +523,48 @@ class CdkDatalakeAnalyticsStack(Stack):
         # State Machine base para validación
         base_definition = self._build_base_state_machine_definition()
         base_config = StepFunctionConfig(
-            name="analytics_base",
-            definition=base_definition
-        )
-        self.state_machine_base = sfn.StateMachine(
-            self, "StateMachineBase",
-            state_machine_name=f"{self.PROJECT_CONFIG.enterprise}-{self.PROJECT_CONFIG.environment.value.lower()}-{self.PROJECT_CONFIG.project_name}-analytics-base-sm",
+            name=f"{self.PROJECT_CONFIG.app_config.get("business_process")}_analytics_base",
             definition_body=sfn.DefinitionBody.from_chainable(base_definition),
             role=self.step_function_role
         )
         
-        # State Machines por capa
-        for layer in self.state_machine_order_list.keys():
-            if layer in self.crawlers_layers:
-                layer_definition = self._build_layer_state_machine_definition(
-                    layer, 
-                    self.crawlers_layers[layer].name
-                )
-                
-                layer_sm = sfn.StateMachine(
-                    self, f"StateMachine{layer.title()}",
-                    state_machine_name=f"{self.PROJECT_CONFIG.enterprise}-{self.PROJECT_CONFIG.environment.value.lower()}-{self.PROJECT_CONFIG.project_name}-analytics-{layer}-sm",
-                    definition_body=sfn.DefinitionBody.from_chainable(layer_definition),
-                    role=self.step_function_role
-                )
-                
-                setattr(self, f"state_machine_{layer}", layer_sm)
-                
-        # State Machine de orquestación principal
-        orchestration_definition = self._build_orchestration_definition()
-        orchestration_sm = sfn.StateMachine(
-            self, "StateMachineOrchestration",
-            state_machine_name=f"{self.PROJECT_CONFIG.enterprise}-{self.PROJECT_CONFIG.environment.value.lower()}-{self.PROJECT_CONFIG.project_name}-analytics-orchestrate-sm",
-            definition_body=sfn.DefinitionBody.from_chainable(orchestration_definition),
-            role=self.step_function_role
+        self.state_machine_base = self.builder.build_step_function(
+            base_config
         )
-        self.state_machine_orchestration = orchestration_sm
+
+        print(f"Order List State Machine: {self.state_machine_order_list}")
+        print(f"Crawler Layers: {self.crawlers_layers}")
+        print(f"Glue Jobs: {self.glue_jobs}")
+        print(f"Relation Process: {self.relation_process}")
+        print(f"Databases Layers: {self.databases_layers}")
+        print(f"Crawlers Layers: {self.cr_targets}")
+
+        ## State Machines por capa
+        #for layer in self.state_machine_order_list.keys():
+        #    if layer in self.crawlers_layers:
+        #        layer_definition = self._build_layer_state_machine_definition(
+        #            layer, 
+        #            self.crawlers_layers[layer].name
+        #        )
+        #        
+        #        layer_sm = sfn.StateMachine(
+        #            self, f"StateMachine{layer.title()}",
+        #            state_machine_name=f"{self.PROJECT_CONFIG.enterprise}-{self.PROJECT_CONFIG.environment.value.lower()}-{self.PROJECT_CONFIG.project_name}-analytics-{layer}-sm",
+        #            definition_body=sfn.DefinitionBody.from_chainable(layer_definition),
+        #            role=self.step_function_role
+        #        )
+        #        
+        #        setattr(self, f"state_machine_{layer}", layer_sm)
+        #        
+        ## State Machine de orquestación principal
+        #orchestration_definition = self._build_orchestration_definition()
+        #orchestration_sm = sfn.StateMachine(
+        #    self, "StateMachineOrchestration",
+        #    state_machine_name=f"{self.PROJECT_CONFIG.enterprise}-{self.PROJECT_CONFIG.environment.value.lower()}-{self.PROJECT_CONFIG.project_name}-analytics-orchestrate-sm",
+        #    definition_body=sfn.DefinitionBody.from_chainable(orchestration_definition),
+        #    role=self.step_function_role
+        #)
+        #self.state_machine_orchestration = orchestration_sm
 
     def _build_base_state_machine_definition(self):
         """Construir definición base de Step Function para validación de jobs"""

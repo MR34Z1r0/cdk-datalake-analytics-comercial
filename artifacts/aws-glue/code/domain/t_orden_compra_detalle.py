@@ -8,10 +8,10 @@ try:
     periodos= spark_controller.get_periods()
     logger.info(periodos)
 
-    m_compania = spark_controller.read_table(data_paths.BIG_BAGIC, "m_compania", cod_pais=cod_pais)
-    m_pais = spark_controller.read_table(data_paths.BIG_BAGIC, "m_pais", cod_pais=cod_pais, have_principal=True)
-    m_tipo_cambio = spark_controller.read_table(data_paths.BIG_BAGIC, "m_tipo_cambio", cod_pais=cod_pais, have_principal=True)
-    t_orden_compra_detalle = spark_controller.read_table(data_paths.BIG_BAGIC, "t_orden_compra_detalle", cod_pais=cod_pais)
+    m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
+    m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais, have_principal=True)
+    m_tipo_cambio = spark_controller.read_table(data_paths.BIG_MAGIC, "m_tipo_cambio", cod_pais=cod_pais, have_principal=True)
+    t_orden_compra_detalle = spark_controller.read_table(data_paths.BIG_MAGIC, "t_orden_compra_detalle", cod_pais=cod_pais)
     t_orden_compra_cabecera_dom = spark_controller.read_table(data_paths.DOMINIO, "t_orden_compra_cabecera", cod_pais=cod_pais)
    
     target_table_name = "t_orden_compra_detalle"

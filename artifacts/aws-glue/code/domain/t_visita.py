@@ -10,10 +10,10 @@ try:
     cod_pais = COD_PAIS.split(",")
     logger.info(f"Databases: {cod_pais}")
 
-    df_m_pais = spark_controller.read_table(data_paths.BIG_BAGIC, "m_pais", cod_pais=cod_pais, have_principal = True)
-    df_m_compania = spark_controller.read_table(data_paths.BIG_BAGIC, "m_compania", cod_pais=cod_pais)
-    df_m_parametro = spark_controller.read_table(data_paths.BIG_BAGIC, "m_parametro", cod_pais=cod_pais)
-    df_t_historico_visita = spark_controller.read_table(data_paths.BIG_BAGIC, "t_visita", cod_pais=cod_pais)
+    df_m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais, have_principal = True)
+    df_m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
+    df_m_parametro = spark_controller.read_table(data_paths.BIG_MAGIC, "m_parametro", cod_pais=cod_pais)
+    df_t_historico_visita = spark_controller.read_table(data_paths.BIG_MAGIC, "t_visita", cod_pais=cod_pais)
     
     df_avance_del_dia__c = spark_controller.read_table(data_paths.SALESFORCE, "t_avance_dia", cod_pais=cod_pais)
     df_avance_autoventa__c = spark_controller.read_table(data_paths.SALESFORCE, "t_avance_autoventa", cod_pais=cod_pais)

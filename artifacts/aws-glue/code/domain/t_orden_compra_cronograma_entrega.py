@@ -9,9 +9,9 @@ try:
     periodos = spark_controller.get_periods()
     logger.info(periodos)
 
-    m_compania = spark_controller.read_table(data_paths.BIG_BAGIC, "m_compania", cod_pais=cod_pais)
-    m_pais = spark_controller.read_table(data_paths.BIG_BAGIC, "m_pais", cod_pais=cod_pais, have_principal=True)
-    t_orden_compra_cronograma_entrega = spark_controller.read_table(data_paths.BIG_BAGIC, "t_orden_compra_cronograma_entrega", cod_pais=cod_pais)
+    m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
+    m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais, have_principal=True)
+    t_orden_compra_cronograma_entrega = spark_controller.read_table(data_paths.BIG_MAGIC, "t_orden_compra_cronograma_entrega", cod_pais=cod_pais)
 
 except Exception as e:
     logger.error(e)

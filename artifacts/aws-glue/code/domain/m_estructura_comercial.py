@@ -7,13 +7,13 @@ spark_controller = SPARK_CONTROLLER()
 try: 
     cod_pais = COD_PAIS.split(",")
 
-    df_m_ruta_distribucion = spark_controller.read_table(data_paths.BIG_BAGIC, "m_ruta", cod_pais=cod_pais)
-    df_m_zona_distribucion = spark_controller.read_table(data_paths.BIG_BAGIC, "m_zona", cod_pais=cod_pais)
-    df_m_centro_distribucion = spark_controller.read_table(data_paths.BIG_BAGIC, "m_division", cod_pais=cod_pais)
-    df_m_subregion = spark_controller.read_table(data_paths.BIG_BAGIC, "m_subregion", cod_pais=cod_pais)
-    df_m_region = spark_controller.read_table(data_paths.BIG_BAGIC, "m_region", cod_pais=cod_pais)
-    df_m_compania = spark_controller.read_table(data_paths.BIG_BAGIC, "m_compania", cod_pais=cod_pais)
-    df_m_pais = spark_controller.read_table(data_paths.BIG_BAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
+    df_m_ruta_distribucion = spark_controller.read_table(data_paths.BIG_MAGIC, "m_ruta", cod_pais=cod_pais)
+    df_m_zona_distribucion = spark_controller.read_table(data_paths.BIG_MAGIC, "m_zona", cod_pais=cod_pais)
+    df_m_centro_distribucion = spark_controller.read_table(data_paths.BIG_MAGIC, "m_division", cod_pais=cod_pais)
+    df_m_subregion = spark_controller.read_table(data_paths.BIG_MAGIC, "m_subregion", cod_pais=cod_pais)
+    df_m_region = spark_controller.read_table(data_paths.BIG_MAGIC, "m_region", cod_pais=cod_pais)
+    df_m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
+    df_m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
 
     df_estructura_comercial__c = spark_controller.read_table(data_paths.SALESFORCE, "m_estructura_comercial", cod_pais=cod_pais)
 

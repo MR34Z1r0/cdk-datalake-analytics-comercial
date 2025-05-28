@@ -6,9 +6,9 @@ spark_controller = SPARK_CONTROLLER()
 try: 
     cod_pais = COD_PAIS.split(",")
  
-    df_m_modelo_atencion = spark_controller.read_table(data_paths.BIG_BAGIC, "m_modelo_atencion", cod_pais=cod_pais)
-    df_m_pais = spark_controller.read_table(data_paths.BIG_BAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
-    df_m_compania = spark_controller.read_table(data_paths.BIG_BAGIC, "m_compania", cod_pais=cod_pais)
+    df_m_modelo_atencion = spark_controller.read_table(data_paths.BIG_MAGIC, "m_modelo_atencion", cod_pais=cod_pais)
+    df_m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
+    df_m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
  
     df_conf_origen = spark_controller.read_table(data_paths.DOMINIO, "conf_origen")
 

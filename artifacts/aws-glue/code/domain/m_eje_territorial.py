@@ -7,11 +7,11 @@ from pyspark.sql.window import Window
 spark_controller = SPARK_CONTROLLER() 
 try: 
     cod_pais = COD_PAIS.split(",")
-    df_m_distrito = spark_controller.read_table(data_paths.BIG_BAGIC, "m_ng3", cod_pais=cod_pais)
-    df_m_provincia = spark_controller.read_table(data_paths.BIG_BAGIC, "m_ng2", cod_pais=cod_pais)
-    df_m_departamento = spark_controller.read_table(data_paths.BIG_BAGIC, "m_ng1", cod_pais=cod_pais)
-    df_m_compania = spark_controller.read_table(data_paths.BIG_BAGIC, "m_compania", cod_pais=cod_pais)
-    df_m_pais = spark_controller.read_table(data_paths.BIG_BAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
+    df_m_distrito = spark_controller.read_table(data_paths.BIG_MAGIC, "m_ng3", cod_pais=cod_pais)
+    df_m_provincia = spark_controller.read_table(data_paths.BIG_MAGIC, "m_ng2", cod_pais=cod_pais)
+    df_m_departamento = spark_controller.read_table(data_paths.BIG_MAGIC, "m_ng1", cod_pais=cod_pais)
+    df_m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
+    df_m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
 
     df_ejeterritorial__c = spark_controller.read_table(data_paths.SALESFORCE, "m_eje_territorial", cod_pais=cod_pais)
     df_conf_origen_dom = spark_controller.read_table(data_paths.DOMINIO, "conf_origen")

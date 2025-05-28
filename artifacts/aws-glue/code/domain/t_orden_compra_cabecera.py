@@ -10,11 +10,11 @@ try:
     logger.info(f"Databases: {cod_pais}")
 
     # Load Stage
-    df_m_compania = spark_controller.read_table(data_paths.BIG_BAGIC, "m_compania", cod_pais=cod_pais)
-    df_m_pais = spark_controller.read_table(data_paths.BIG_BAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
-    df_m_tipo_cambio = spark_controller.read_table(data_paths.BIG_BAGIC, "m_tipo_cambio", cod_pais=cod_pais)
-    df_m_moneda = spark_controller.read_table(data_paths.BIG_BAGIC, "m_moneda", cod_pais=cod_pais)
-    df_t_orden_compra_cabecera = spark_controller.read_table(data_paths.BIG_BAGIC, "t_orden_compra_cabecera", cod_pais=cod_pais)
+    df_m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
+    df_m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
+    df_m_tipo_cambio = spark_controller.read_table(data_paths.BIG_MAGIC, "m_tipo_cambio", cod_pais=cod_pais)
+    df_m_moneda = spark_controller.read_table(data_paths.BIG_MAGIC, "m_moneda", cod_pais=cod_pais)
+    df_t_orden_compra_cabecera = spark_controller.read_table(data_paths.BIG_MAGIC, "t_orden_compra_cabecera", cod_pais=cod_pais)
 
     target_table_name = "t_orden_compra_cabecera"
 

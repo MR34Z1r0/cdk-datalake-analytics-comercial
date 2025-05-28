@@ -8,11 +8,11 @@ spark_controller = SPARK_CONTROLLER()
 try:
     cod_pais = COD_PAIS.split(",") 
 
-    m_asignacion_modulo = spark_controller.read_table(data_paths.BIG_BAGIC, "m_asignacion_modulo", cod_pais=cod_pais)
-    m_sucursal = spark_controller.read_table(data_paths.BIG_BAGIC, "m_sucursal", cod_pais=cod_pais)
-    m_pais = spark_controller.read_table(data_paths.BIG_BAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
-    m_compania = spark_controller.read_table(data_paths.BIG_BAGIC, "m_compania", cod_pais=cod_pais)
-    m_cliente = spark_controller.read_table(data_paths.BIG_BAGIC, "m_cliente", cod_pais=cod_pais)
+    m_asignacion_modulo = spark_controller.read_table(data_paths.BIG_MAGIC, "m_asignacion_modulo", cod_pais=cod_pais)
+    m_sucursal = spark_controller.read_table(data_paths.BIG_MAGIC, "m_sucursal", cod_pais=cod_pais)
+    m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
+    m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
+    m_cliente = spark_controller.read_table(data_paths.BIG_MAGIC, "m_cliente", cod_pais=cod_pais)
 
     asignacion_modulo__c = spark_controller.read_table(data_paths.SALESFORCE, "m_asignacion_modulo")
     modulo__c = spark_controller.read_table(data_paths.SALESFORCE, "m_modulo")

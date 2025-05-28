@@ -7,10 +7,10 @@ spark_controller = SPARK_CONTROLLER()
 try: 
     cod_pais = COD_PAIS.split(",") 
     
-    df_m_vendedor = spark_controller.read_table(data_paths.BIG_BAGIC, "m_vendedor", cod_pais=cod_pais)
-    df_m_persona = spark_controller.read_table(data_paths.BIG_BAGIC, "m_persona", cod_pais=cod_pais)
-    df_m_pais = spark_controller.read_table(data_paths.BIG_BAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
-    df_m_compania = spark_controller.read_table(data_paths.BIG_BAGIC, "m_compania", cod_pais=cod_pais)
+    df_m_vendedor = spark_controller.read_table(data_paths.BIG_MAGIC, "m_vendedor", cod_pais=cod_pais)
+    df_m_persona = spark_controller.read_table(data_paths.BIG_MAGIC, "m_persona", cod_pais=cod_pais)
+    df_m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
+    df_m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
 
     #df_vw_vendedor_c =""
     #df_vw_user=""

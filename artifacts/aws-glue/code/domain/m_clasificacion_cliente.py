@@ -7,12 +7,12 @@ spark_controller = SPARK_CONTROLLER()
 try:
     cod_pais = COD_PAIS.split(",")
     
-    i_relacion_consumo = spark_controller.read_table(data_paths.BIG_BAGIC, "i_relacion_consumo", cod_pais=cod_pais)
-    m_canal_visibilidad = spark_controller.read_table(data_paths.BIG_BAGIC, "m_canal", cod_pais=cod_pais)
-    m_subgiro_visibilidad = spark_controller.read_table(data_paths.BIG_BAGIC, "m_subgiro", cod_pais=cod_pais)
-    m_giro_visibilidad = spark_controller.read_table(data_paths.BIG_BAGIC, "m_giro", cod_pais=cod_pais)
-    m_compania = spark_controller.read_table(data_paths.BIG_BAGIC, "m_compania", cod_pais=cod_pais)
-    m_pais = spark_controller.read_table(data_paths.BIG_BAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
+    i_relacion_consumo = spark_controller.read_table(data_paths.BIG_MAGIC, "i_relacion_consumo", cod_pais=cod_pais)
+    m_canal_visibilidad = spark_controller.read_table(data_paths.BIG_MAGIC, "m_canal", cod_pais=cod_pais)
+    m_subgiro_visibilidad = spark_controller.read_table(data_paths.BIG_MAGIC, "m_subgiro", cod_pais=cod_pais)
+    m_giro_visibilidad = spark_controller.read_table(data_paths.BIG_MAGIC, "m_giro", cod_pais=cod_pais)
+    m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
+    m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
 
     eje_clasificacion__c =  spark_controller.read_table(data_paths.SALESFORCE, "m_clasificacion_cliente")
 

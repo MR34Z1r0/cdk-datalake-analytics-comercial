@@ -9,9 +9,9 @@ try:
     periodos= spark_controller.get_periods()
     logger.info(periodos)
 
-    m_pais = spark_controller.read_table(data_paths.BIG_BAGIC, "m_pais", cod_pais=cod_pais, have_principal=True)
-    m_compania = spark_controller.read_table(data_paths.BIG_BAGIC, "m_compania", cod_pais=cod_pais)
-    t_movimiento_inventario = spark_controller.read_table(data_paths.BIG_BAGIC, "t_movimiento_inventario", cod_pais=cod_pais)
+    m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais, have_principal=True)
+    m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
+    t_movimiento_inventario = spark_controller.read_table(data_paths.BIG_MAGIC, "t_movimiento_inventario", cod_pais=cod_pais)
 
     target_table_name = "t_reparto"
 

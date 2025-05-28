@@ -13,11 +13,11 @@ spark_controller = SPARK_CONTROLLER()
 
 try:
     cod_pais = COD_PAIS.split(",")
-    m_periodo = spark_controller.read_table(data_paths.BIG_BAGIC, "m_periodo", cod_pais=cod_pais)
-    # m_fecha = spark_controller.read_table(data_paths.BIG_BAGIC, "m_fecha", cod_pais=cod_pais)
-    m_compania = spark_controller.read_table(data_paths.BIG_BAGIC, "m_compania", cod_pais=cod_pais)
-    #m_pais = spark_controller.read_table(data_paths.BIG_BAGIC, "m_pais", cod_pais=cod_pais)
-    m_pais = spark_controller.read_table(data_paths.BIG_BAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
+    m_periodo = spark_controller.read_table(data_paths.BIG_MAGIC, "m_periodo", cod_pais=cod_pais)
+    # m_fecha = spark_controller.read_table(data_paths.BIG_MAGIC, "m_fecha", cod_pais=cod_pais)
+    m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
+    #m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais)
+    m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
     
     target_table_name = "m_periodo_contable"
 

@@ -8,9 +8,9 @@ try:
 
     cod_pais = COD_PAIS.split(",")
 
-    m_compania = spark_controller.read_table(data_paths.BIG_BAGIC, "m_compania", cod_pais=cod_pais)
-    m_pais = spark_controller.read_table(data_paths.BIG_BAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
-    m_unidad_medida_equivalente = spark_controller.read_table(data_paths.BIG_BAGIC, "m_unidad_medida_equivalente", cod_pais=cod_pais)
+    m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
+    m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
+    m_unidad_medida_equivalente = spark_controller.read_table(data_paths.BIG_MAGIC, "m_unidad_medida_equivalente", cod_pais=cod_pais)
 
     target_table_name = "m_unidad_medida_equivalente"
     

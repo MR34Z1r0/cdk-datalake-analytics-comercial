@@ -6,9 +6,9 @@ from pyspark.sql.types import StringType, IntegerType, DateType, TimestampType,D
 spark_controller = SPARK_CONTROLLER() 
 try:
     cod_pais = COD_PAIS.split(",") 
-    df_m_compania = spark_controller.read_table(data_paths.BIG_BAGIC, "m_compania", cod_pais=cod_pais)
-    df_m_pais = spark_controller.read_table(data_paths.BIG_BAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
-    df_m_familia_equipo = spark_controller.read_table(data_paths.BIG_BAGIC, "m_familia_equipo", cod_pais=cod_pais) 
+    df_m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
+    df_m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
+    df_m_familia_equipo = spark_controller.read_table(data_paths.BIG_MAGIC, "m_familia_equipo", cod_pais=cod_pais) 
     target_table_name = "m_familia_equipo" 
 except Exception as e:
     logger.error(e)
