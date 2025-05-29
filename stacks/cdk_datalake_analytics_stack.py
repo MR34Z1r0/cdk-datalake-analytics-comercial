@@ -376,7 +376,7 @@ class CdkDatalakeAnalyticsStack(Stack):
         base_args = {
             '--extra-py-files': f's3://{self.s3_artifacts_bucket.bucket_name}/{self.Paths.AWS_ARTIFACTS_GLUE_LAYER}/common_jobs_functions.py',
             '--S3_PATH_STG': f"s3a://{self.s3_stage_bucket.bucket_name}/{self.PROJECT_CONFIG.app_config['team']}/",
-            '--S3_PATH_ANALYTICS': f"s3a://{self.s3_analytics_bucket.bucket_name}/{self.PROJECT_CONFIG.app_config['team']}/{self.PROJECT_CONFIG.app_config['business_process']}/",
+            '--S3_PATH_ANALYTICS': f"s3a://{self.s3_analytics_bucket.bucket_name}/{self.PROJECT_CONFIG.app_config['team']}/",
             '--S3_PATH_EXTERNAL': f"s3a://{self.s3_external_bucket.bucket_name}/{self.PROJECT_CONFIG.app_config['team']}/",
             '--S3_PATH_ARTIFACTS': f"s3a://{self.s3_artifacts_bucket.bucket_name}/{self.Paths.AWS_ARTIFACTS_GLUE}/",
             '--S3_PATH_ARTIFACTS_CSV': f"s3a://{self.s3_artifacts_bucket.bucket_name}/{self.Paths.AWS_ARTIFACTS_GLUE_CSV}",

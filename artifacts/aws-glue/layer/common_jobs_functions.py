@@ -77,7 +77,7 @@ dynamodb_client = boto3.client('dynamodb')
 class data_paths:
     ANALYTICS = f"{S3_PATH_ANALYTICS}{BUSINESS_PROCESS}/analytics/"
     DOMAIN = f"{S3_PATH_ANALYTICS}{BUSINESS_PROCESS}/domain/"
-    BIG_MAGIC = f"{S3_PATH_STG}apdayc/"
+    APDAYC = f"{S3_PATH_STG}apdayc/"
     EXTERNAL = f"{S3_PATH_EXTERNAL}"
     ARTIFACTS_CSV = f"{S3_PATH_ARTIFACTS_CSV}"
     
@@ -142,7 +142,7 @@ class SPARK_CONTROLLER():
                 else:
                     df = self.spark.read.format("csv").option("sep", ";").option("header", "true").load(s3_path)
 
-            elif path == data_paths.BIG_MAGIC:
+            elif path == data_paths.APDAYC:
                 table = dynamodb_resource.Table(DYNAMODB_DATABASE_NAME)
                 # Escaneo con filtro
                 response = table.scan(
