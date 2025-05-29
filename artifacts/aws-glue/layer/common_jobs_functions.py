@@ -1,6 +1,7 @@
 import logging
 import os
 import boto3
+from boto3.dynamodb.conditions import Attr
 import datetime as dt
 import sys
 import pytz
@@ -65,6 +66,8 @@ NOW_LIMA = dt.datetime.now(pytz.utc).astimezone(TZ_LIMA)
 logger.info(f"project name: {PROJECT_NAME} | flow name:  {FLOW_NAME} | process name: {PROCESS_NAME}")
 logger.info(f"COD_PAIS: {COD_PAIS}")
 logger.info(f"INSTANCIAS: {INSTANCIAS}")
+
+DATA_SOURCES = ["apdayc"]
 
 s3 = boto3.client('s3')
 sns_client = boto3.client("sns")
@@ -139,31 +142,30 @@ class SPARK_CONTROLLER():
                 else:
                     df = self.spark.read.format("csv").option("sep", ";").option("header", "true").load(s3_path)
 
-            elif path == data_paths.BIG_BAGIC:
-                response = dynamodb_client.scan(TableName=DYNAMODB_DATABASE_NAME)
-                
+            elif path == data_paths.BIG_MAGIC:
+                table = dynamodb_resource.Table(DYNAMODB_DATABASE_NAME)
+                # Escaneo con filtro
+                response = table.scan(
+                    FilterExpression=Attr('DATA_SOURCE').is_in(DATA_SOURCES) & 
+                                    Attr('TEAM').eq(TEAM)
+                )
+
                 allowed_countrys = []
                 for item in response.get('Items', []):
                     if have_principal:
-                        if not item.get('IS_PRINCIPAL', {'BOOL' : False})['BOOL']:
+                        if not item.get('IS_PRINCIPAL', False):
                             continue
-                    id_pais = item['ENDPOINT_NAME']['S']
-                    #if id_pais starts with values in cod_pais, append it to allowed_countrys
+                    id_pais = item['ENDPOINT_NAME'] 
                     cod_pais = INSTANCIAS.split(",")
                     for pais in cod_pais:
                         if id_pais.startswith(pais):
                             allowed_countrys.append(id_pais)
-                    #if id_pais[:4] in cod_pais:
-                    #    allowed_countrys.append(id_pais)
- 
                 
                 df_list = []
                 for carpeta in allowed_countrys:
                     try:
                         carpeta_path = f"{path}{carpeta}/{table_name}/"
                         print(f"Leyendo archivos desde: {carpeta_path}")
-                        
-
                         # Leer archivos con PySpark (modifica el formato si es necesario)
                         df_tmp = self.spark.read.format("delta").load(carpeta_path)
                         df_list.append(df_tmp)

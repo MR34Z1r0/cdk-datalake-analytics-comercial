@@ -517,7 +517,7 @@ class CdkDatalakeAnalyticsStack(Stack):
             self.builder.tag_resource(database, f"database-{layer_key}", "AWS Glue")
             self.builder.tag_resource(crawler, f"crawler-{layer_key}", "AWS Glue")
 
-    def _create_step_functions(self):
+    def _create_step_functions_bkp(self):
         """Crear Step Functions usando aje-cdk-libs"""
         
         # State Machine base para validación
@@ -567,6 +567,153 @@ class CdkDatalakeAnalyticsStack(Stack):
         #    role=self.step_function_role
         #)
         #self.state_machine_orchestration = orchestration_sm
+
+    def _create_step_functions(self):
+        """Crear Step Functions usando aje-cdk-libs"""
+        
+        # 1. PRIMERO: Crear State Machine base SIN referenciar otras State Machines
+        base_definition = self._build_base_state_machine_definition()
+        base_config = StepFunctionConfig(
+            name=f"workflow_{self.PROJECT_CONFIG.app_config.get('business_process')}_base",
+            definition_body=sfn.DefinitionBody.from_chainable(base_definition),
+            #role=self.step_function_role
+        )
+        
+        self.state_machine_base = self.builder.build_step_function(base_config)
+
+        # 2. SEGUNDO: Crear State Machines por capa
+        for layer in self.state_machine_order_list.keys():
+            if layer in self.crawlers_layers:
+                # Crear definición SIN referenciar state_machine_base en la definición
+                layer_definition = self._build_layer_state_machine_definition(
+                    layer, 
+                    self.crawlers_layers[layer].name
+                )
+
+                layer_config = StepFunctionConfig(
+                    name=f"workflow_{self.PROJECT_CONFIG.app_config.get('business_process')}_{layer}",
+                    definition_body=sfn.DefinitionBody.from_chainable(layer_definition),
+                    #role=self.step_function_role
+                )
+
+                layer_sf = self.builder.build_step_function(layer_config)
+                setattr(self, f"state_machine_{layer}", layer_sf)
+        
+        # 3. TERCERO: Actualizar permisos del role DESPUÉS de crear las State Machines
+        self._update_step_function_permissions()
+
+    def _build_layer_state_machine_definition(self, layer: str, crawler_name: str):
+        """Construir definición de Step Function SIN referenciar otras State Machines"""
+        
+        jobs_by_order = self.state_machine_order_list.get(layer, {})
+        
+        current_state = None
+        initial_state = None
+        
+        # Procesar jobs por orden de ejecución
+        for order in sorted(jobs_by_order.keys()):
+            if int(order) <= 0:
+                continue
+                
+            # Crear estado paralelo para este orden
+            parallel_state = sfn.Parallel(
+                self, f"{layer}_order_{order}",
+                result_path="$.execution_results"
+            )
+            
+            # Agregar cada job como rama paralela
+            for job_config in jobs_by_order[order]:
+                job_execution = tasks.StepFunctionsStartExecution(
+                    self, f"{layer}_{job_config['table']}",
+                    state_machine=self.state_machine_base,
+                    input=sfn.TaskInput.from_object({
+                        "exe_process_id.$": "$.exe_process_id",
+                        "own_process_id": job_config['process_id'],
+                        "job_name": job_config['job_name'],
+                        "COD_PAIS.$": "$.COD_PAIS",
+                        "INSTANCIAS.$": "$.INSTANCIAS",
+                        "redshift": False
+                    }),
+                    integration_pattern=sfn.IntegrationPattern.RUN_JOB
+                )
+                parallel_state.branch(job_execution)
+                
+            # Conectar estados secuencialmente
+            if current_state is None:
+                initial_state = parallel_state
+            else:
+                current_state.next(parallel_state)
+                
+            current_state = parallel_state
+        
+        # Agregar crawler al final (mismo código que antes)
+        if crawler_name and current_state:
+            crawler_task = tasks.LambdaInvoke(
+                self, f"run_crawler_{layer}",
+                lambda_function=self.lambda_crawler,
+                payload=sfn.TaskInput.from_object({
+                    "CRAWLER_NAME": crawler_name
+                }),
+                result_path="$.crawler_result"
+            )
+            
+            crawler_wait = sfn.Wait(
+                self, f"wait_crawler_{layer}",
+                time=sfn.WaitTime.duration(Duration.seconds(60))
+            )
+            
+            crawler_choice = sfn.Choice(self, f"check_crawler_{layer}")
+            
+            start_crawler = tasks.CallAwsService(
+                self, f"start_crawler_{layer}",
+                service="glue",
+                action="startCrawler",
+                parameters={"Name": crawler_name},
+                iam_resources=["*"]
+            )
+            
+            crawler_task.next(
+                crawler_choice
+                .when(
+                    sfn.Condition.boolean_equals("$.crawler_result.Payload.wait", True),
+                    crawler_wait.next(crawler_task)
+                )
+                .otherwise(start_crawler)
+            )
+            
+            current_state.next(crawler_task)
+            
+        return initial_state or sfn.Succeed(self, f"no_jobs_{layer}")
+
+    def _update_step_function_permissions(self):
+        """Actualizar permisos del role DESPUÉS de crear todas las State Machines"""
+        
+        # Crear política separada para evitar dependencias circulares
+        policy_statements = []
+        
+        # Agregar permisos para cada State Machine creada
+        for layer in self.state_machine_order_list.keys():
+            if hasattr(self, f"state_machine_{layer}"):
+                state_machine = getattr(self, f"state_machine_{layer}")
+                policy_statements.append(
+                    iam.PolicyStatement(
+                        effect=iam.Effect.ALLOW,
+                        actions=[
+                            "states:StartExecution",
+                            "states:StopExecution", 
+                            "states:DescribeExecution"
+                        ],
+                        resources=[state_machine.state_machine_arn]
+                    )
+                )
+        
+        # Crear política independiente
+        if policy_statements:
+            step_function_policy = iam.Policy(
+                self, "StepFunctionCrossExecutionPolicy",
+                statements=policy_statements
+            )
+            step_function_policy.attach_to_role(self.step_function_role)
 
     def _build_base_state_machine_definition(self):
         """Construir definición base de Step Function para validación de jobs"""
@@ -636,89 +783,6 @@ class CdkDatalakeAnalyticsStack(Stack):
         )
         
         return validate_execution
-
-    def _build_layer_state_machine_definition(self, layer: str, crawler_name: str):
-        """Construir definición de Step Function para una capa específica"""
-        
-        jobs_by_order = self.state_machine_order_list.get(layer, {})
-        
-        current_state = None
-        initial_state = None
-        
-        # Procesar jobs por orden de ejecución
-        for order in sorted(jobs_by_order.keys()):
-            if int(order) <= 0:
-                continue
-                
-            # Crear estado paralelo para este orden
-            parallel_state = sfn.Parallel(
-                self, f"{layer.title()}Order{order}",
-                result_path="$.execution_results"
-            )
-            
-            # Agregar cada job como rama paralela
-            for job_config in jobs_by_order[order]:
-                job_execution = tasks.StepFunctionsStartExecution(
-                    self, f"Execute{layer.title()}{job_config['table'].title()}",
-                    state_machine=self.state_machine_base,
-                    input=sfn.TaskInput.from_object({
-                        "exe_process_id.$": "$.exe_process_id",
-                        "own_process_id": job_config['process_id'],
-                        "job_name": job_config['job_name'],
-                        "COD_PAIS.$": "$.COD_PAIS",
-                        "INSTANCIAS.$": "$.INSTANCIAS",
-                        "redshift": False
-                    }),
-                    integration_pattern=sfn.IntegrationPattern.RUN_JOB
-                )
-                parallel_state.branch(job_execution)
-                
-            # Conectar estados secuencialmente
-            if current_state is None:
-                initial_state = parallel_state
-            else:
-                current_state.next(parallel_state)
-                
-            current_state = parallel_state
-            
-        # Agregar crawler al final
-        if crawler_name and current_state:
-            crawler_task = tasks.LambdaInvoke(
-                self, f"RunCrawler{layer.title()}",
-                lambda_function=self.lambda_crawler,
-                payload=sfn.TaskInput.from_object({
-                    "CRAWLER_NAME": crawler_name
-                }),
-                result_path="$.crawler_result"
-            )
-            
-            crawler_wait = sfn.Wait(
-                self, f"WaitCrawler{layer.title()}",
-                time=sfn.WaitTime.duration(Duration.seconds(60))
-            )
-            
-            crawler_choice = sfn.Choice(self, f"CheckCrawler{layer.title()}")
-            
-            start_crawler = tasks.CallAwsService(
-                self, f"StartCrawler{layer.title()}",
-                service="glue",
-                action="startCrawler",
-                parameters={"Name": crawler_name},
-                iam_resources=["*"]
-            )
-            
-            crawler_task.next(
-                crawler_choice
-                .when(
-                    sfn.Condition.boolean_equals("$.crawler_result.Payload.wait", True),
-                    crawler_wait.next(crawler_task)
-                )
-                .otherwise(start_crawler)
-            )
-            
-            current_state.next(crawler_task)
-            
-        return initial_state or sfn.Succeed(self, f"NoJobs{layer.title()}")
 
     def _build_layer_state_machine(self, layer: str, crawler: cdk.aws_glue.CfnCrawler = None):
         """Crear Step Function para una capa específica"""
