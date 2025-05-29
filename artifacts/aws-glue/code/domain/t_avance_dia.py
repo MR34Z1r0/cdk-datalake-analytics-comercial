@@ -267,7 +267,7 @@ try:
     cod_pais = COD_PAIS.split(",")
 
     # # Load Dominio
-    # df_t_avance_dia_dom = spark_controller.read_table(data_paths.DOMINIO, "t_avance_dia").where(
+    # df_t_avance_dia_dom = spark_controller.read_table(data_paths.DOMAIN, "t_avance_dia").where(
     #     (col("id_pais").isin(cod_pais)) & (col("id_periodo").isin(PERIODOS))
     # )
 
@@ -920,7 +920,7 @@ try:
     )
 
     partition_columns_array = ["id_pais","id_periodo"]
-    spark_controller.write_table(tmp_insert, data_paths.DOMINIO, target_table_name, partition_columns_array)    
+    spark_controller.write_table(tmp_insert, data_paths.DOMAIN, target_table_name, partition_columns_array)    
 
     #df_t_avance_dia_dom = df_t_avance_dia_dom.union(tmp_insert)
 

@@ -18,7 +18,7 @@ try:
     modulo__c = spark_controller.read_table(data_paths.SALESFORCE, "m_modulo")
     account = spark_controller.read_table(data_paths.SALESFORCE, "m_cliente")
 
-    conf_origen = spark_controller.read_table(data_paths.DOMINIO, "conf_origen")
+    conf_origen = spark_controller.read_table(data_paths.DOMAIN , "conf_origen")
     target_table_name = "m_asignacion_modulo"
 
     tmp_dominio_config = (
@@ -452,7 +452,7 @@ try:
     id_columns = ["id_asignacion_modulo"]
     partition_columns_array = ["id_pais"]
     logger.info(f"starting upsert of {target_table_name}")
-    spark_controller.upsert(df_final, data_paths.DOMINIO, target_table_name, id_columns, partition_columns_array)
+    spark_controller.upsert(df_final, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
 
 except Exception as e:
     logger.error(e)

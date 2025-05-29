@@ -200,7 +200,7 @@ try:
     id_columns = ["id_clasificacion_cliente"]
     partition_columns_array = ["id_pais"]
     logger.info(f"starting upsert of {target_table_name}")
-    spark_controller.upsert(tmp_dominio_m_clasificacion_cliente, data_paths.DOMINIO, target_table_name, id_columns, partition_columns_array)
+    spark_controller.upsert(tmp_dominio_m_clasificacion_cliente, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
 
 except Exception as e:
     logger.error(e)

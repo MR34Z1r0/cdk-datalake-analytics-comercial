@@ -14,7 +14,7 @@ try:
     df_m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
 
     df_ejeterritorial__c = spark_controller.read_table(data_paths.SALESFORCE, "m_eje_territorial", cod_pais=cod_pais)
-    df_conf_origen_dom = spark_controller.read_table(data_paths.DOMINIO, "conf_origen")
+    df_conf_origen_dom = spark_controller.read_table(data_paths.DOMAIN, "conf_origen")
     
     target_table_name = "m_eje_territorial"
 except Exception as e:
@@ -332,7 +332,7 @@ try:
     id_columns = ["id_eje_territorial"]
     partition_columns_array = ["id_pais"]
     logger.info(f"starting upsert of {target_table_name}")
-    spark_controller.upsert(tmp_dominio_m_eje_territorial, data_paths.DOMINIO, target_table_name, id_columns, partition_columns_array)
+    spark_controller.upsert(tmp_dominio_m_eje_territorial, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
 
 
 except Exception as e:

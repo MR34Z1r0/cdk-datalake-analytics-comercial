@@ -64,9 +64,9 @@ try:
     
 
      # Insertar nuevos registros
-    if spark_controller.table_exists(data_paths.DOMINIO, "m_periodo_contable"):
+    if spark_controller.table_exists(data_paths.DOMAIN, "m_periodo_contable"):
         print("existe")
-        m_periodo_contable = spark_controller.read_table(data_paths.DOMINIO, "m_periodo_contable")
+        m_periodo_contable = spark_controller.read_table(data_paths.DOMAIN, "m_periodo_contable")
         new_records = tmp_periodo_contable_2.alias("tmp_pc2") \
             .join(m_periodo_contable.alias("mpc"), col("tmp_pc2.id_periodo_contable") == col("mpc.id_periodo_contable"), "left_anti") \
             .select(
@@ -83,8 +83,8 @@ try:
     else:
         print("no existe")
         new_records = tmp_periodo_contable_2
-    spark_controller.insert_into_table(new_records, data_paths.DOMINIO, target_table_name)
-    m_periodo_contable = spark_controller.read_table(data_paths.DOMINIO, "m_periodo_contable")
+    spark_controller.insert_into_table(new_records, data_paths.DOMAIN, target_table_name)
+    m_periodo_contable = spark_controller.read_table(data_paths.DOMAIN, "m_periodo_contable")
     # Actualizar registros existentes
     tmp_periodo_contable_2.show()
     update_records = tmp_periodo_contable_2.alias("b") \
@@ -107,7 +107,7 @@ try:
         "id_periodo_contable"
     ]
     print(6)
-    spark_controller.update_table(data_paths.DOMINIO, target_table_name, update_records, update_expr)
+    spark_controller.update_table(data_paths.DOMAIN, target_table_name, update_records, update_expr)
 
 
 

@@ -10,19 +10,19 @@ try:
     cod_pais = COD_PAIS.split(",")
     logger.info(f"Databases: {cod_pais}")
 
-    df_m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais, have_principal = True)
-    df_m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
-    df_i_relacion_proced_venta = spark_controller.read_table(data_paths.BIG_MAGIC, "i_relacion_proced_venta", cod_pais=cod_pais)
-    df_m_procedimiento = spark_controller.read_table(data_paths.BIG_MAGIC, "m_procedimiento", cod_pais=cod_pais)
-    df_m_articulo = spark_controller.read_table(data_paths.BIG_MAGIC, "m_articulo", cod_pais=cod_pais)
+    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais, have_principal = True)
+    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
+    df_i_relacion_proced_venta = spark_controller.read_table(data_paths.APDAYC, "i_relacion_proced_venta", cod_pais=cod_pais)
+    df_m_procedimiento = spark_controller.read_table(data_paths.APDAYC, "m_procedimiento", cod_pais=cod_pais)
+    df_m_articulo = spark_controller.read_table(data_paths.APDAYC, "m_articulo", cod_pais=cod_pais)
  
-    df_t_historico_pedido = spark_controller.read_table(data_paths.BIG_MAGIC, "t_documento_pedido", cod_pais=cod_pais)
-    df_t_historico_pedido_detalle = spark_controller.read_table(data_paths.BIG_MAGIC, "t_documento_pedido_detalle", cod_pais=cod_pais)
-    df_t_historico_pedido_ades = spark_controller.read_table(data_paths.BIG_MAGIC, "t_documento_pedido_ades", cod_pais=cod_pais)
-    df_t_historico_pedido_ades_detalle = spark_controller.read_table(data_paths.BIG_MAGIC, "t_documento_pedido_ades_detalle", cod_pais=cod_pais)
-    df_t_historico_almacen = spark_controller.read_table(data_paths.BIG_MAGIC, "t_movimiento_inventario", cod_pais=cod_pais)
-    df_t_historico_venta = spark_controller.read_table(data_paths.BIG_MAGIC, "t_documento_venta", cod_pais=cod_pais)
-    df_t_historico_venta_detalle = spark_controller.read_table(data_paths.BIG_MAGIC, "t_documento_venta_detalle", cod_pais=cod_pais) 
+    df_t_historico_pedido = spark_controller.read_table(data_paths.APDAYC, "t_documento_pedido", cod_pais=cod_pais)
+    df_t_historico_pedido_detalle = spark_controller.read_table(data_paths.APDAYC, "t_documento_pedido_detalle", cod_pais=cod_pais)
+    df_t_historico_pedido_ades = spark_controller.read_table(data_paths.APDAYC, "t_documento_pedido_ades", cod_pais=cod_pais)
+    df_t_historico_pedido_ades_detalle = spark_controller.read_table(data_paths.APDAYC, "t_documento_pedido_ades_detalle", cod_pais=cod_pais)
+    df_t_historico_almacen = spark_controller.read_table(data_paths.APDAYC, "t_movimiento_inventario", cod_pais=cod_pais)
+    df_t_historico_venta = spark_controller.read_table(data_paths.APDAYC, "t_documento_venta", cod_pais=cod_pais)
+    df_t_historico_venta_detalle = spark_controller.read_table(data_paths.APDAYC, "t_documento_venta_detalle", cod_pais=cod_pais) 
 
     logger.info("Dataframes load successfully")
 except Exception as e:
@@ -531,7 +531,7 @@ try:
 
     logger.info(f"starting write of {target_table_name}")
     partition_columns_array = ["id_pais", "id_periodo"]
-    spark_controller.write_table(df_t_pedido_detalle_cumplimiento, data_paths.DOMINIO, target_table_name, partition_columns_array)
+    spark_controller.write_table(df_t_pedido_detalle_cumplimiento, data_paths.DOMAIN, target_table_name, partition_columns_array)
 except Exception as e:
     logger.error(e)
     raise 

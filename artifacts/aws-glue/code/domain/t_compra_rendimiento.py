@@ -22,7 +22,7 @@ try:
     ])
 
     t_compras_rendimiento = spark_controller.read_table(data_paths.EXTERNAL, "cadena/global/compras_rendimiento", schema=schema_t_compra_rendimiento)
-    m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais, have_principal=True)
+    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais, have_principal=True)
 
     target_table_name = "t_compra_rendimiento"
 
@@ -78,7 +78,7 @@ try:
     )
 
     partition_columns_array = ["id_pais", "id_periodo"]
-    spark_controller.write_table(tmp, data_paths.DOMINIO, target_table_name, partition_columns_array)
+    spark_controller.write_table(tmp, data_paths.DOMAIN, target_table_name, partition_columns_array)
 
 except Exception as e:
     logger.error(e)

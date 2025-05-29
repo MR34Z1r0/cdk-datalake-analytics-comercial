@@ -11,16 +11,16 @@ try:
     periodos = spark_controller.get_periods()
     logger.info(periodos)
 
-    m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
-    m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais, have_principal=True)
-    m_tipo_embarque = spark_controller.read_table(data_paths.BIG_MAGIC, "m_tipo_embarque", cod_pais=cod_pais)
-    m_termino = spark_controller.read_table(data_paths.BIG_MAGIC, "m_termino", cod_pais=cod_pais)
-    m_proveedor = spark_controller.read_table(data_paths.BIG_MAGIC, "m_proveedor", cod_pais=cod_pais)
-    m_unidad = spark_controller.read_table(data_paths.BIG_MAGIC, "m_unidad", cod_pais=cod_pais)
-    t_cotizacion_compra = spark_controller.read_table(data_paths.BIG_MAGIC, "t_cotizacion_compra", cod_pais=cod_pais)
-    t_orden_compra_cabecera = spark_controller.read_table(data_paths.BIG_MAGIC, "t_orden_compra_cabecera", cod_pais=cod_pais)
-    t_orden_compra_detalle = spark_controller.read_table(data_paths.BIG_MAGIC, "t_orden_compra_detalle", cod_pais=cod_pais)
-    t_requerimiento_compra_cabecera = spark_controller.read_table(data_paths.BIG_MAGIC, "t_requerimiento_compra_cabecera", cod_pais=cod_pais)
+    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
+    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais, have_principal=True)
+    m_tipo_embarque = spark_controller.read_table(data_paths.APDAYC, "m_tipo_embarque", cod_pais=cod_pais)
+    m_termino = spark_controller.read_table(data_paths.APDAYC, "m_termino", cod_pais=cod_pais)
+    m_proveedor = spark_controller.read_table(data_paths.APDAYC, "m_proveedor", cod_pais=cod_pais)
+    m_unidad = spark_controller.read_table(data_paths.APDAYC, "m_unidad", cod_pais=cod_pais)
+    t_cotizacion_compra = spark_controller.read_table(data_paths.APDAYC, "t_cotizacion_compra", cod_pais=cod_pais)
+    t_orden_compra_cabecera = spark_controller.read_table(data_paths.APDAYC, "t_orden_compra_cabecera", cod_pais=cod_pais)
+    t_orden_compra_detalle = spark_controller.read_table(data_paths.APDAYC, "t_orden_compra_detalle", cod_pais=cod_pais)
+    t_requerimiento_compra_cabecera = spark_controller.read_table(data_paths.APDAYC, "t_requerimiento_compra_cabecera", cod_pais=cod_pais)
 
 except Exception as e:
     logger.error(e)
@@ -192,7 +192,7 @@ try:
     )
 
     partition_columns_array = ["id_pais", "id_periodo"]
-    spark_controller.write_table(tmp, data_paths.DOMINIO, target_table_name, partition_columns_array)
+    spark_controller.write_table(tmp, data_paths.DOMAIN, target_table_name, partition_columns_array)
 
 except Exception as e:
     logger.error(e)

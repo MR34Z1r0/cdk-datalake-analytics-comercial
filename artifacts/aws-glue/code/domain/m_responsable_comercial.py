@@ -15,7 +15,7 @@ try:
     #df_vw_vendedor_c =""
     #df_vw_user=""
     
-    df_conf_origen = spark_controller.read_table(data_paths.DOMINIO, "conf_origen")
+    df_conf_origen = spark_controller.read_table(data_paths.DOMAIN, "conf_origen")
     
     target_table_name = "m_responsable_comercial"
 except Exception as e:
@@ -98,7 +98,7 @@ try:
 
     id_columns = ["id_responsable_comercial"]
     partition_columns_array = ["id_pais"]
-    spark_controller.upsert(tmp_m_vendedor_bm, data_paths.DOMINIO, target_table_name, id_columns, partition_columns_array) 
+    spark_controller.upsert(tmp_m_vendedor_bm, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array) 
 except Exception as e:
     logger.error(str(e))
     raise

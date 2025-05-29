@@ -11,11 +11,11 @@ spark_controller = SPARK_CONTROLLER()
 
 try:
     cod_pais = COD_PAIS.split(",")
-    m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
-    m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais)
-    t_voucher_cabecera = spark_controller.read_table(data_paths.BIG_MAGIC, "t_voucher_cabecera", cod_pais=cod_pais)
-    t_voucher_eliminados = spark_controller.read_table(data_paths.BIG_MAGIC, "t_voucher_eliminados", cod_pais=cod_pais)
-    t_voucher_detalle = spark_controller.read_table(data_paths.BIG_MAGIC, "t_voucher_detalle", cod_pais=cod_pais)
+    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
+    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais)
+    t_voucher_cabecera = spark_controller.read_table(data_paths.APDAYC, "t_voucher_cabecera", cod_pais=cod_pais)
+    t_voucher_eliminados = spark_controller.read_table(data_paths.APDAYC, "t_voucher_eliminados", cod_pais=cod_pais)
+    t_voucher_detalle = spark_controller.read_table(data_paths.APDAYC, "t_voucher_detalle", cod_pais=cod_pais)
 
     global_sccc_configuracion_cds = spark_controller.read_table(data_paths.EXTERNAL, "CONFIGURACION_CDS")
     global_sccc_configuracion_ebitda_centro_costo_plan_cuenta = spark_controller.read_table(data_paths.EXTERNAL, "CONFIGURACION_EBITDA_CENTRO_COSTO_PLAN_CUENTA")
@@ -132,7 +132,7 @@ try:
     )
 
     
-    spark_controller.write_table(tmp_t_voucher_resumen_2, data_paths.DOMINIO, target_table_name)
+    spark_controller.write_table(tmp_t_voucher_resumen_2, data_paths.DOMAIN, target_table_name)
 
 
     # Para la lógica con configuracion_cds, seguir la referencia en dominio_old/t_voucher_resumen

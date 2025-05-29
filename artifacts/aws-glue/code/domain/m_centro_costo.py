@@ -94,7 +94,7 @@ try:
 
     id_columns = ["id_centro_costo"]
     partition_columns_array = ["id_pais"]
-    spark_controller.upsert(tmp_m_centro_costo_add_centro_costo_bp, data_paths.DOMINIO, target_table_name, id_columns, partition_columns_array)
+    spark_controller.upsert(tmp_m_centro_costo_add_centro_costo_bp, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
 
 
 except Exception as e:

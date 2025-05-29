@@ -34,7 +34,7 @@ else:
                 col("continente").cast(StringType()).alias("desc_continente")
             )
         
-        spark_controller.upsert(tmp_dominio_m_pais, data_paths.DOMINIO, target_table_name, ['id_pais'])
+        spark_controller.upsert(tmp_dominio_m_pais, data_paths.DOMAIN, target_table_name, ['id_pais'])
 
        
     except Exception as e:

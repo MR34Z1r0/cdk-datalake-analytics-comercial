@@ -8,7 +8,7 @@ target_table_name = "conf_origen"
 try:
     df_conf_origen =  spark_controller.read_table(data_paths.ARTIFACTS_CSV, "conf_origen.csv")
 
-    spark_controller.write_table(df_conf_origen, data_paths.DOMINIO, target_table_name)
+    spark_controller.write_table(df_conf_origen, data_paths.DOMAIN, target_table_name)
 except Exception as e:
     logger.error(e)
     raise

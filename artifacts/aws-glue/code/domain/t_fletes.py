@@ -9,23 +9,23 @@ try:
     periodos= spark_controller.get_periods()
     logger.info(periodos)
 
-    m_almacen = spark_controller.read_table(data_paths.BIG_MAGIC, "m_almacen", cod_pais=cod_pais)
-    m_articulo = spark_controller.read_table(data_paths.BIG_MAGIC, "m_articulo", cod_pais=cod_pais)
-    m_capacidad_vehiculo = spark_controller.read_table(data_paths.BIG_MAGIC, "m_capacidad_vehiculo", cod_pais=cod_pais)
-    m_cliente = spark_controller.read_table(data_paths.BIG_MAGIC, "m_cliente", cod_pais=cod_pais)
-    m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
-    m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais, have_principal=True)
-    m_persona = spark_controller.read_table(data_paths.BIG_MAGIC, "m_persona", cod_pais=cod_pais)
-    m_procedimiento = spark_controller.read_table(data_paths.BIG_MAGIC, "m_procedimiento", cod_pais=cod_pais)
-    m_sucursal = spark_controller.read_table(data_paths.BIG_MAGIC, "m_sucursal", cod_pais=cod_pais)
-    m_tarifa_flete = spark_controller.read_table(data_paths.BIG_MAGIC, "m_tarifa_flete", cod_pais=cod_pais)
-    m_tipo_cambio = spark_controller.read_table(data_paths.BIG_MAGIC, "m_tipo_cambio", cod_pais=cod_pais)
-    t_documento_flete = spark_controller.read_table(data_paths.BIG_MAGIC, "t_documento_flete", cod_pais=cod_pais)
-    t_guia_por_flete = spark_controller.read_table(data_paths.BIG_MAGIC, "t_guia_por_flete", cod_pais=cod_pais)
-    t_movimiento_inventario = spark_controller.read_table(data_paths.BIG_MAGIC, "t_movimiento_inventario", cod_pais=cod_pais)
-    t_movimiento_inventario_detalle = spark_controller.read_table(data_paths.BIG_MAGIC, "t_movimiento_inventario_detalle", cod_pais=cod_pais)
-    t_requerimiento_compra_cabecera = spark_controller.read_table(data_paths.BIG_MAGIC, "t_requerimiento_compra_cabecera", cod_pais=cod_pais)
-    t_requerimiento_servicio_flete = spark_controller.read_table(data_paths.BIG_MAGIC, "t_requerimiento_servicio_flete", cod_pais=cod_pais)
+    m_almacen = spark_controller.read_table(data_paths.APDAYC, "m_almacen", cod_pais=cod_pais)
+    m_articulo = spark_controller.read_table(data_paths.APDAYC, "m_articulo", cod_pais=cod_pais)
+    m_capacidad_vehiculo = spark_controller.read_table(data_paths.APDAYC, "m_capacidad_vehiculo", cod_pais=cod_pais)
+    m_cliente = spark_controller.read_table(data_paths.APDAYC, "m_cliente", cod_pais=cod_pais)
+    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
+    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais, have_principal=True)
+    m_persona = spark_controller.read_table(data_paths.APDAYC, "m_persona", cod_pais=cod_pais)
+    m_procedimiento = spark_controller.read_table(data_paths.APDAYC, "m_procedimiento", cod_pais=cod_pais)
+    m_sucursal = spark_controller.read_table(data_paths.APDAYC, "m_sucursal", cod_pais=cod_pais)
+    m_tarifa_flete = spark_controller.read_table(data_paths.APDAYC, "m_tarifa_flete", cod_pais=cod_pais)
+    m_tipo_cambio = spark_controller.read_table(data_paths.APDAYC, "m_tipo_cambio", cod_pais=cod_pais)
+    t_documento_flete = spark_controller.read_table(data_paths.APDAYC, "t_documento_flete", cod_pais=cod_pais)
+    t_guia_por_flete = spark_controller.read_table(data_paths.APDAYC, "t_guia_por_flete", cod_pais=cod_pais)
+    t_movimiento_inventario = spark_controller.read_table(data_paths.APDAYC, "t_movimiento_inventario", cod_pais=cod_pais)
+    t_movimiento_inventario_detalle = spark_controller.read_table(data_paths.APDAYC, "t_movimiento_inventario_detalle", cod_pais=cod_pais)
+    t_requerimiento_compra_cabecera = spark_controller.read_table(data_paths.APDAYC, "t_requerimiento_compra_cabecera", cod_pais=cod_pais)
+    t_requerimiento_servicio_flete = spark_controller.read_table(data_paths.APDAYC, "t_requerimiento_servicio_flete", cod_pais=cod_pais)
 
     target_table_name = "t_fletes"
 
@@ -709,7 +709,7 @@ try:
     # logger.info("tmp_t_fletes types casted succesfully")
 
     partition_columns_array = ["id_pais", "id_periodo"]
-    spark_controller.write_table(tmp, data_paths.DOMINIO, target_table_name, partition_columns_array)
+    spark_controller.write_table(tmp, data_paths.DOMAIN, target_table_name, partition_columns_array)
 
 
 except Exception as e:

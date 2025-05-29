@@ -221,7 +221,7 @@ try:
 
     id_columns = ["id_cuenta_contable"]
     partition_columns_array = ["id_pais"]
-    spark_controller.upsert(tmp_dim_cuenta_contable_add_grupo_cogs, data_paths.DOMINIO, target_table_name, id_columns, partition_columns_array)
+    spark_controller.upsert(tmp_dim_cuenta_contable_add_grupo_cogs, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
 except Exception as e:
     logger.error(e)
     raise

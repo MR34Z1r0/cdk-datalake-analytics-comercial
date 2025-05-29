@@ -9,13 +9,13 @@ try:
     cod_pais = COD_PAIS.split(",")
     logger.info(f"Databases: {cod_pais}")
 
-    df_m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais, have_principal = True)
-    df_m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
-    df_m_parametro = spark_controller.read_table(data_paths.BIG_MAGIC, "m_parametro", cod_pais=cod_pais)
-    df_m_articulo = spark_controller.read_table(data_paths.BIG_MAGIC, "m_articulo", cod_pais=cod_pais)
-    df_m_procedimiento = spark_controller.read_table(data_paths.BIG_MAGIC, "m_procedimiento", cod_pais=cod_pais)
-    df_t_historico_pedido_detalle = spark_controller.read_table(data_paths.BIG_MAGIC, "t_documento_pedido_detalle", cod_pais=cod_pais)
-    df_t_historico_pedido_ades_detalle = spark_controller.read_table(data_paths.BIG_MAGIC, "t_documento_pedido_ades_detalle", cod_pais=cod_pais) 
+    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais, have_principal = True)
+    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
+    df_m_parametro = spark_controller.read_table(data_paths.APDAYC, "m_parametro", cod_pais=cod_pais)
+    df_m_articulo = spark_controller.read_table(data_paths.APDAYC, "m_articulo", cod_pais=cod_pais)
+    df_m_procedimiento = spark_controller.read_table(data_paths.APDAYC, "m_procedimiento", cod_pais=cod_pais)
+    df_t_historico_pedido_detalle = spark_controller.read_table(data_paths.APDAYC, "t_documento_pedido_detalle", cod_pais=cod_pais)
+    df_t_historico_pedido_ades_detalle = spark_controller.read_table(data_paths.APDAYC, "t_documento_pedido_ades_detalle", cod_pais=cod_pais) 
 
     logger.info("Dataframes cargados correctamente")
 except Exception as e:
@@ -422,7 +422,7 @@ try:
     ) 
 
     partition_columns_array = ["id_pais", "id_periodo"]
-    spark_controller.write_table(df_t_pedido_detalle, data_paths.DOMINIO, target_table_name, partition_columns_array)
+    spark_controller.write_table(df_t_pedido_detalle, data_paths.DOMAIN, target_table_name, partition_columns_array)
 except Exception as e:
     logger.error(e) 
     raise

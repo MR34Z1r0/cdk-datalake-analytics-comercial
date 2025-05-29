@@ -18,7 +18,7 @@ try:
     df_modulo__c = spark_controller.read_table(data_paths.SALESFORCE, "m_modulo", cod_pais=cod_pais)
     df_fuerza_de_venta__c = spark_controller.read_table(data_paths.SALESFORCE, "m_fuerza_venta", cod_pais=cod_pais)
  
-    df_conf_origen = spark_controller.read_table(data_paths.DOMINIO, "conf_origen")
+    df_conf_origen = spark_controller.read_table(data_paths.DOMAIN, "conf_origen")
 
 except Exception as e:
     logger.error(str(e))
@@ -197,7 +197,7 @@ try:
     id_columns = ["id_modulo"]
     partition_columns_array = ["id_pais"]
 
-    spark_controller.upsert(tmp_dominio_modulo, data_paths.DOMINIO, target_table_name, id_columns, partition_columns_array)
+    spark_controller.upsert(tmp_dominio_modulo, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
 
 except Exception as e:
     logger.error(e)

@@ -9,15 +9,15 @@ try:
     periodos= spark_controller.get_periods()
     logger.info(periodos)
 
-    m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
-    m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais, have_principal=True)
-    m_parametro = spark_controller.read_table(data_paths.BIG_MAGIC, "m_parametro", cod_pais=cod_pais)
-    m_documento_almacen = spark_controller.read_table(data_paths.BIG_MAGIC, "m_documento_almacen", cod_pais=cod_pais)
-    m_articulo = spark_controller.read_table(data_paths.BIG_MAGIC, "m_articulo", cod_pais=cod_pais)
-    m_tipo_cambio = spark_controller.read_table(data_paths.BIG_MAGIC, "m_tipo_cambio", cod_pais=cod_pais)
-    t_cierre_inventario_cpm = spark_controller.read_table(data_paths.BIG_MAGIC, "t_cierre_inventario_cpm", cod_pais=cod_pais)
-    t_movimiento_inventario_detalle = spark_controller.read_table(data_paths.BIG_MAGIC, "t_movimiento_inventario_detalle", cod_pais=cod_pais)
-    t_movimiento_inventario_dom = spark_controller.read_table(data_paths.DOMINIO, "t_movimiento_inventario", cod_pais=cod_pais)
+    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
+    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais, have_principal=True)
+    m_parametro = spark_controller.read_table(data_paths.APDAYC, "m_parametro", cod_pais=cod_pais)
+    m_documento_almacen = spark_controller.read_table(data_paths.APDAYC, "m_documento_almacen", cod_pais=cod_pais)
+    m_articulo = spark_controller.read_table(data_paths.APDAYC, "m_articulo", cod_pais=cod_pais)
+    m_tipo_cambio = spark_controller.read_table(data_paths.APDAYC, "m_tipo_cambio", cod_pais=cod_pais)
+    t_cierre_inventario_cpm = spark_controller.read_table(data_paths.APDAYC, "t_cierre_inventario_cpm", cod_pais=cod_pais)
+    t_movimiento_inventario_detalle = spark_controller.read_table(data_paths.APDAYC, "t_movimiento_inventario_detalle", cod_pais=cod_pais)
+    t_movimiento_inventario_dom = spark_controller.read_table(data_paths.DOMAIN, "t_movimiento_inventario", cod_pais=cod_pais)
 
 except Exception as e:
     logger.error(e)
@@ -227,7 +227,7 @@ try:
     )
 
     partition_columns_array = ["id_pais", "id_periodo"]
-    spark_controller.write_table(tmp, data_paths.DOMINIO, target_table_name, partition_columns_array)
+    spark_controller.write_table(tmp, data_paths.DOMAIN, target_table_name, partition_columns_array)
 
 except Exception as e:
     logger.error(e)

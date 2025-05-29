@@ -10,7 +10,7 @@ try:
     df_m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
     df_m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
 
-    df_conf_origen = spark_controller.read_table(data_paths.DOMINIO, "conf_origen")
+    df_conf_origen = spark_controller.read_table(data_paths.DOMAIN, "conf_origen")
 
     target_table_name = "m_fuerza_venta"
 
@@ -50,7 +50,7 @@ try:
     id_columns = ["id_fuerza_venta"]
     partition_columns_array = ["id_pais"]
     logger.info(f"starting upsert of {target_table_name}")
-    spark_controller.upsert(tmp_m_fuerza_venta, data_paths.DOMINIO, target_table_name, id_columns, partition_columns_array)
+    spark_controller.upsert(tmp_m_fuerza_venta, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
 
 except Exception as e:
     logger.error(str(e))

@@ -10,10 +10,10 @@ try:
     cod_pais = COD_PAIS.split(",")
     logger.info(f"Databases: {cod_pais}")
 
-    df_m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais, have_principal = True)
-    df_m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
-    df_m_parametro = spark_controller.read_table(data_paths.BIG_MAGIC, "m_parametro", cod_pais=cod_pais)
-    df_t_historico_visita = spark_controller.read_table(data_paths.BIG_MAGIC, "t_visita", cod_pais=cod_pais)
+    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais, have_principal = True)
+    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
+    df_m_parametro = spark_controller.read_table(data_paths.APDAYC, "m_parametro", cod_pais=cod_pais)
+    df_t_historico_visita = spark_controller.read_table(data_paths.APDAYC, "t_visita", cod_pais=cod_pais)
     
     df_avance_del_dia__c = spark_controller.read_table(data_paths.SALESFORCE, "t_avance_dia", cod_pais=cod_pais)
     df_avance_autoventa__c = spark_controller.read_table(data_paths.SALESFORCE, "t_avance_autoventa", cod_pais=cod_pais)
@@ -21,7 +21,7 @@ try:
     df_account = spark_controller.read_table(data_paths.SALESFORCE, "m_cliente", cod_pais=cod_pais) 
     df_modulo__c = spark_controller.read_table(data_paths.SALESFORCE, "m_modulo", cod_pais=cod_pais) 
 
-    df_conf_origen = spark_controller.read_table(data_paths.DOMINIO, "conf_origen").cache()
+    df_conf_origen = spark_controller.read_table(data_paths.DOMAIN, "conf_origen").cache()
 
     logger.info("Dataframes load successfully")
 except Exception as e:
@@ -157,7 +157,7 @@ try:
  
     partition_columns_array = ["id_pais", "id_periodo"]
     logger.info(f"starting write of {target_table_name}")
-    spark_controller.write_table(df_t_visita, data_paths.DOMINIO, target_table_name, partition_columns_array)
+    spark_controller.write_table(df_t_visita, data_paths.DOMAIN, target_table_name, partition_columns_array)
 except Exception as e:
     logger.error(e) 
     raise 

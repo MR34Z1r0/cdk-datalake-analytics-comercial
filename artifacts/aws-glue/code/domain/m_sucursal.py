@@ -50,7 +50,7 @@ try:
 
     id_columns = ["id_sucursal"]
     partition_columns_array = ["id_pais"]
-    spark_controller.upsert(tmp_dominio_m_sucursal, data_paths.DOMINIO, target_table_name, id_columns, partition_columns_array)
+    spark_controller.upsert(tmp_dominio_m_sucursal, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
 
 except Exception as e:
     logger.error(str(e))

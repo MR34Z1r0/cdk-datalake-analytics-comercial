@@ -9,15 +9,15 @@ try:
     cod_pais = COD_PAIS.split(",")
     logger.info(f"Databases: {cod_pais}")
 
-    df_m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais, have_principal = True)
-    df_m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
-    df_m_parametro = spark_controller.read_table(data_paths.BIG_MAGIC, "m_parametro", cod_pais=cod_pais)
-    df_m_tipo_cambio = spark_controller.read_table(data_paths.BIG_MAGIC, "m_tipo_cambio", cod_pais=cod_pais)
-    df_m_region = spark_controller.read_table(data_paths.BIG_MAGIC, "m_region", cod_pais=cod_pais, have_principal = True)
-    df_m_subregion = spark_controller.read_table(data_paths.BIG_MAGIC, "m_subregion", cod_pais=cod_pais, have_principal = True)
-    df_m_centro_distribucion = spark_controller.read_table(data_paths.BIG_MAGIC, "m_division", cod_pais=cod_pais)
-    df_m_zona_distribucion = spark_controller.read_table(data_paths.BIG_MAGIC, "m_zona", cod_pais=cod_pais)
-    df_t_historico_venta = spark_controller.read_table(data_paths.BIG_MAGIC, "t_documento_venta", cod_pais=cod_pais)
+    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais, have_principal = True)
+    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
+    df_m_parametro = spark_controller.read_table(data_paths.APDAYC, "m_parametro", cod_pais=cod_pais)
+    df_m_tipo_cambio = spark_controller.read_table(data_paths.APDAYC, "m_tipo_cambio", cod_pais=cod_pais)
+    df_m_region = spark_controller.read_table(data_paths.APDAYC, "m_region", cod_pais=cod_pais, have_principal = True)
+    df_m_subregion = spark_controller.read_table(data_paths.APDAYC, "m_subregion", cod_pais=cod_pais, have_principal = True)
+    df_m_centro_distribucion = spark_controller.read_table(data_paths.APDAYC, "m_division", cod_pais=cod_pais)
+    df_m_zona_distribucion = spark_controller.read_table(data_paths.APDAYC, "m_zona", cod_pais=cod_pais)
+    df_t_historico_venta = spark_controller.read_table(data_paths.APDAYC, "t_documento_venta", cod_pais=cod_pais)
 
     logger.info("Dataframes load successfully")
 except Exception as e:
@@ -170,7 +170,7 @@ try:
     
     logger.info(f"starting write of {target_table_name}")
     partition_columns_array = ["id_pais", "id_periodo"]
-    spark_controller.write_table(df_t_venta, data_paths.DOMINIO, target_table_name, partition_columns_array)
+    spark_controller.write_table(df_t_venta, data_paths.DOMAIN, target_table_name, partition_columns_array)
 except Exception as e:
     logger.error(e) 
     raise 
