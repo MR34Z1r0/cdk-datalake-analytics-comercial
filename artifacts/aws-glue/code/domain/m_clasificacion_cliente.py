@@ -8,12 +8,12 @@ spark_controller = SPARK_CONTROLLER()
 try:
     cod_pais = COD_PAIS.split(",")
 
-    i_relacion_consumo = spark_controller.read_table(data_paths.BIG_MAGIC, "i_relacion_consumo", cod_pais=cod_pais)
-    m_canal_visibilidad = spark_controller.read_table(data_paths.BIG_MAGIC, "m_canal", cod_pais=cod_pais)
-    m_subgiro_visibilidad = spark_controller.read_table(data_paths.BIG_MAGIC, "m_subgiro", cod_pais=cod_pais)
-    m_giro_visibilidad = spark_controller.read_table(data_paths.BIG_MAGIC, "m_giro", cod_pais=cod_pais)
-    m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
-    m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais, have_principal=True)
+    i_relacion_consumo = spark_controller.read_table(data_paths.APDAYC, "i_relacion_consumo", cod_pais=cod_pais)
+    m_canal_visibilidad = spark_controller.read_table(data_paths.APDAYC, "m_canal", cod_pais=cod_pais)
+    m_subgiro_visibilidad = spark_controller.read_table(data_paths.APDAYC, "m_subgiro", cod_pais=cod_pais)
+    m_giro_visibilidad = spark_controller.read_table(data_paths.APDAYC, "m_giro", cod_pais=cod_pais)
+    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
+    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais, have_principal=True)
 
     conf_origen_dom = spark_controller.read_table(data_paths.DOMINIO, "conf_origen")
 

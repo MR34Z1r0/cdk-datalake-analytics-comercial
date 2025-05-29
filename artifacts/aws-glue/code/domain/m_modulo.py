@@ -9,11 +9,11 @@ target_table_name = "m_modulo"
 try:
     cod_pais = COD_PAIS.split(",")
  
-    df_m_modulo = spark_controller.read_table(data_paths.BIG_MAGIC, "m_modulo", cod_pais=cod_pais)
-    df_m_ruta = spark_controller.read_table(data_paths.BIG_MAGIC, "m_ruta", cod_pais=cod_pais) 
-    df_m_sucursal = spark_controller.read_table(data_paths.BIG_MAGIC, "m_sucursal", cod_pais=cod_pais)
-    df_m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
-    df_m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
+    df_m_modulo = spark_controller.read_table(data_paths.APDAYC, "m_modulo", cod_pais=cod_pais)
+    df_m_ruta = spark_controller.read_table(data_paths.APDAYC, "m_ruta", cod_pais=cod_pais) 
+    df_m_sucursal = spark_controller.read_table(data_paths.APDAYC, "m_sucursal", cod_pais=cod_pais)
+    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais,have_principal = True)
+    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
  
     df_modulo__c = spark_controller.read_table(data_paths.SALESFORCE, "m_modulo", cod_pais=cod_pais)
     df_fuerza_de_venta__c = spark_controller.read_table(data_paths.SALESFORCE, "m_fuerza_venta", cod_pais=cod_pais)

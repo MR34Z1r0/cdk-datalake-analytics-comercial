@@ -6,9 +6,9 @@ from pyspark.sql.types import StringType
 spark_controller = SPARK_CONTROLLER()
 try:
     cod_pais = COD_PAIS.split(",")
-    df_m_fuerza_venta = spark_controller.read_table(data_paths.BIG_MAGIC, "m_fuerza_venta", cod_pais=cod_pais)
-    df_m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
-    df_m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
+    df_m_fuerza_venta = spark_controller.read_table(data_paths.APDAYC, "m_fuerza_venta", cod_pais=cod_pais)
+    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais,have_principal = True)
+    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
 
     df_conf_origen = spark_controller.read_table(data_paths.DOMAIN, "conf_origen")
 

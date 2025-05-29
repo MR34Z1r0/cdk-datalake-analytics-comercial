@@ -7,9 +7,9 @@ target_table_name = "m_empleado"
 try:
     cod_pais = COD_PAIS.split(",")
 
-    m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
-    m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
-    m_empleado = spark_controller.read_table(data_paths.BIG_MAGIC, "m_empleado", cod_pais=cod_pais)
+    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais,have_principal = True)
+    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
+    m_empleado = spark_controller.read_table(data_paths.APDAYC, "m_empleado", cod_pais=cod_pais)
 
 
 except Exception as e:
