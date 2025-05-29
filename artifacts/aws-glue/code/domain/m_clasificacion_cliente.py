@@ -15,7 +15,7 @@ try:
     m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
     m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais, have_principal=True)
 
-    conf_origen_dom = spark_controller.read_table(data_paths.DOMINIO, "conf_origen")
+    conf_origen_dom = spark_controller.read_table(data_paths.DOMAIN, "conf_origen")
 
     target_table_name = "m_clasificacion_cliente"
 

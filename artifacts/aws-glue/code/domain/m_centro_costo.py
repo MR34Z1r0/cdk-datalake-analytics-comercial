@@ -12,12 +12,12 @@ spark_controller = SPARK_CONTROLLER()
 try:
     cod_pais = COD_PAIS.split(",")
 
-    df_centro_costo = spark_controller.read_table(data_paths.BIG_MAGIC, "m_centro_costo", cod_pais=cod_pais)
-    df_centro_costo_corp = spark_controller.read_table(data_paths.BIG_MAGIC, "m_centro_costo_corporativo", cod_pais=cod_pais)
-    df_area = spark_controller.read_table(data_paths.BIG_MAGIC, "m_area", cod_pais=cod_pais)
-    df_gerencia = spark_controller.read_table(data_paths.BIG_MAGIC, "m_gerencia", cod_pais=cod_pais)
-    m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
-    m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais,have_principal = True)
+    df_centro_costo = spark_controller.read_table(data_paths.APDAYC, "m_centro_costo", cod_pais=cod_pais)
+    df_centro_costo_corp = spark_controller.read_table(data_paths.APDAYC, "m_centro_costo_corporativo", cod_pais=cod_pais)
+    df_area = spark_controller.read_table(data_paths.APDAYC, "m_area", cod_pais=cod_pais)
+    df_gerencia = spark_controller.read_table(data_paths.APDAYC, "m_gerencia", cod_pais=cod_pais)
+    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
+    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais,have_principal = True)
     df_ebitda_centro_costo = spark_controller.read_table(data_paths.EXTERNAL, "CONFIGURACION_EBITDA_CENTRO_COSTO")
     
     target_table_name = "m_centro_costo"

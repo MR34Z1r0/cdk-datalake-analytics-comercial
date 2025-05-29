@@ -7,12 +7,12 @@ target_table_name = "m_categoria_compra"
 
 try:
     cod_pais = COD_PAIS.split(",")
-    m_compania = spark_controller.read_table(data_paths.BIG_MAGIC, "m_compania", cod_pais=cod_pais)
-    m_pais = spark_controller.read_table(data_paths.BIG_MAGIC, "m_pais", cod_pais=cod_pais, have_principal = True)
-    m_articulo_categoria_compra = spark_controller.read_table(data_paths.BIG_MAGIC, "m_articulo_categoria_compra", cod_pais=cod_pais)
-    m_categoria_compra = spark_controller.read_table(data_paths.BIG_MAGIC, "m_categoria_compra", cod_pais=cod_pais)
-    m_sub_categoria_compra = spark_controller.read_table(data_paths.BIG_MAGIC, "m_sub_categoria_compra", cod_pais=cod_pais)
-    m_sub_categoria2_compra = spark_controller.read_table(data_paths.BIG_MAGIC, "m_sub_categoria2_compra", cod_pais=cod_pais)
+    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
+    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais, have_principal = True)
+    m_articulo_categoria_compra = spark_controller.read_table(data_paths.APDAYC, "m_articulo_categoria_compra", cod_pais=cod_pais)
+    m_categoria_compra = spark_controller.read_table(data_paths.APDAYC, "m_categoria_compra", cod_pais=cod_pais)
+    m_sub_categoria_compra = spark_controller.read_table(data_paths.APDAYC, "m_sub_categoria_compra", cod_pais=cod_pais)
+    m_sub_categoria2_compra = spark_controller.read_table(data_paths.APDAYC, "m_sub_categoria2_compra", cod_pais=cod_pais)
 except Exception as e:
     logger.error(e)
     raise
