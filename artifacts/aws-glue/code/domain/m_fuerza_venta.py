@@ -10,7 +10,7 @@ try:
     df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais,have_principal = True)
     df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
 
-    df_conf_origen = spark_controller.read_table(data_paths.DOMAIN, "conf_origen")
+    #df_conf_origen = spark_controller.read_table(data_paths.DOMAIN, "conf_origen")
 
     target_table_name = "m_fuerza_venta"
 
@@ -19,31 +19,37 @@ except Exception as e:
     raise
 try:
     tmp1 = (
-        df_m_fuerza_venta.alias("mfv")
-        .join(
-            df_m_compania.alias("mc"),
-            col("mfv.cod_compania") == col("mc.cod_compania"),
-            "inner",
-        )
-        .join(df_m_pais.alias("mp"), col("mc.cod_pais") == col("mp.cod_pais"), "inner")
-        .join(df_conf_origen.alias("co"), (col("co.id_pais") == col("mp.id_pais"))
-              & (col("co.nombre_tabla") == "m_fuerza_venta")
-              & (col("co.nombre_origen") == "bigmagic"),
-              "inner",
-        )
-        .where(col("mp.id_pais").isin(cod_pais))
-        .select(
-            concat(
-                trim(col("mfv.cod_compania")),
-                lit("|"),
-                trim(col("mfv.cod_sucursal")),
-                lit("|"),
-                trim(col("mfv.cod_fuerza_venta")),
-            ).cast(StringType()).alias("id_fuerza_venta"),
-            col("mp.id_pais").cast(StringType()).alias("id_pais"),
-            trim(col("mfv.cod_fuerza_venta")).cast(StringType()).alias("cod_fuerza_venta"),
-            col("mfv.desc_fuerza_venta").cast(StringType()).alias("desc_fuerza_venta")
-        )
+    df_m_fuerza_venta.alias("mfv")
+    .join(
+        df_m_compania.alias("mc"),
+        col("mfv.cod_compania") == col("mc.cod_compania"),
+        "inner",
+    )
+    .join(
+        df_m_pais.alias("mp"),
+        (col("mc.cod_pais") == col("mp.cod_pais")) & (col("mc.id_pais") == col("mp.id_pais")),
+        "inner",
+    )
+       # .join(
+    #     df_conf_origen.alias("co"),
+    #     (col("co.id_pais") == col("mp.id_pais")) &
+    #     (col("co.nombre_tabla") == lit("m_fuerza_venta")) &
+    #     (col("co.nombre_origen") == lit("bigmagic")),
+    #     "inner",
+    # )
+    .where(col("mp.id_pais").isin(cod_pais))
+    .select(
+        concat(
+            trim(col("mfv.cod_compania")),
+            lit("|"),
+            trim(col("mfv.cod_sucursal")),
+            lit("|"),
+            trim(col("mfv.cod_fuerza_venta")),
+        ).cast(StringType()).alias("id_fuerza_venta"),
+        col("mp.id_pais").cast(StringType()).alias("id_pais"),
+        trim(col("mfv.cod_fuerza_venta")).cast(StringType()).alias("cod_fuerza_venta"),
+        col("mfv.desc_fuerza_venta").cast(StringType()).alias("desc_fuerza_venta")
+    )
     )
     tmp_m_fuerza_venta = tmp1
 
