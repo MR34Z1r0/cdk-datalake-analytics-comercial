@@ -17,7 +17,7 @@ try:
 
     df_estructura_comercial__c = spark_controller.read_table(data_paths.SALESFORCE, "m_estructura_comercial", cod_pais=cod_pais)
 
-    df_conf_origen_dom = spark_controller.read_table(data_paths.DOMINIO, "conf_origen") 
+    df_conf_origen_dom = spark_controller.read_table(data_paths.DOMAIN, "conf_origen") 
     target_table_name = "m_estructura_comercial"
 
 except Exception as e:

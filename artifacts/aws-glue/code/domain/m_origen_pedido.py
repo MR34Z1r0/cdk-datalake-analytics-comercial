@@ -4,8 +4,10 @@ from pyspark.sql.functions import col, concat, lit, coalesce, when, trim, row_nu
 from pyspark.sql.types import StringType, DateType
 
 spark_controller = SPARK_CONTROLLER() 
+
+cod_pais = COD_PAIS.split(",") 
 try: 
-    cod_pais = COD_PAIS.split(",") 
+    
 
     df_m_origen_pedido = spark_controller.read_table(data_paths.APDAYC, "m_origen_pedido", cod_pais=cod_pais)
     df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais,have_principal = True)

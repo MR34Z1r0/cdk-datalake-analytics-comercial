@@ -30,7 +30,7 @@ else:
                 col("id_pais").cast(StringType()),
                 col("cod_pais").cast(StringType()),
                 col("desc_pais").cast(StringType()),
-                col("desc_pais_comercial").cast(StringType()),
+                #col("desc_pais_comercial").cast(StringType()),
                 col("continente").cast(StringType()).alias("desc_continente")
             )
         

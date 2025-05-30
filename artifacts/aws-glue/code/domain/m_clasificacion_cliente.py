@@ -154,7 +154,7 @@ try:
             col("fecha_creacion"),
             col("fecha_modificacion"),
         )
-    )
+    )  
 
     tmp_dominio_m_clasificacion_cliente_bmagic = tmp4.union(tmp5).union(tmp6).distinct()
 
