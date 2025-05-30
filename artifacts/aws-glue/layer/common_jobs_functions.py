@@ -13,6 +13,7 @@ from pyspark.context import SparkContext
 from pyspark.sql.session import SparkSession
 from delta.tables import DeltaTable
 from pyspark.sql.functions import col
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DoubleType, BooleanType, DateType, TimestampType
 
 logging.basicConfig(format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -30,6 +31,7 @@ args = getResolvedOptions(
         "BUSINESS_PROCESS",
         "REGION_NAME",
         "DYNAMODB_DATABASE_NAME",
+        "DYNAMODB_COLUMNS_NAME",
         "INSTANCIAS",
         "COD_PAIS",
         "DYNAMODB_LOGS_TABLE",
@@ -50,8 +52,9 @@ TEAM = args["TEAM"]
 BUSINESS_PROCESS = args["BUSINESS_PROCESS"]
 REGION_NAME = args["REGION_NAME"]
 DYNAMODB_DATABASE_NAME = args["DYNAMODB_DATABASE_NAME"]
+DYNAMODB_COLUMNS_NAME = args["DYNAMODB_COLUMNS_NAME"]
 INSTANCIAS = args["INSTANCIAS"]
-COD_PAIS = args["COD_PAIS"]
+#COD_PAIS = args["COD_PAIS"]
 
 DYNAMODB_LOGS_TABLE = args["DYNAMODB_LOGS_TABLE"]
 ERROR_TOPIC_ARN = args["ERROR_TOPIC_ARN"]
@@ -64,7 +67,7 @@ TZ_LIMA = pytz.timezone("America/Lima")
 NOW_LIMA = dt.datetime.now(pytz.utc).astimezone(TZ_LIMA)
 
 logger.info(f"project name: {PROJECT_NAME} | flow name:  {FLOW_NAME} | process name: {PROCESS_NAME}")
-logger.info(f"COD_PAIS: {COD_PAIS}")
+#logger.info(f"COD_PAIS: {COD_PAIS}")
 logger.info(f"INSTANCIAS: {INSTANCIAS}")
 
 DATA_SOURCES = ["apdayc"]
@@ -113,7 +116,73 @@ class SPARK_CONTROLLER():
             .getOrCreate()
 
         self.logger = LOGGING_UTILS()
+    
+    def _create_empty_dataframe_from_dynamodb(self, table_name, cod_pais = []):
+        """
+        Crea un DataFrame vacío basado en el schema definido en DynamoDB
+        para la tabla sofia-dev-datalake-columns-specifications-ddb
+        """
+        try:
+            # Conectar a la tabla de especificaciones de columnas
+            columns_table = dynamodb_resource.Table(DYNAMODB_COLUMNS_NAME)
+            
+            # Buscar las especificaciones de la tabla
+            response = columns_table.scan(
+                FilterExpression=Attr('TABLE_NAME').eq(table_name) & 
+                            Attr('TEAM').eq(TEAM) & 
+                            Attr('IS_PRINCIPAL').eq(True)
+            )
 
+            items = []
+            for item in response.get('Items', []):
+                for INSTANCE in INSTANCIAS.split(","):
+                    if item['INSTANCE'] == INSTANCE:
+                        items.append(item)
+
+            if len(items) == 0:
+                logger.error(f"No se encontraron especificaciones de columnas para la tabla {table_name}")
+                # Crear un DataFrame vacío básico si no hay especificaciones
+                return self.spark.createDataFrame([], StructType([]))
+            
+            # Ordenar por COLUMN_ID para mantener el orden correcto
+            columns_specs = sorted(items, key=lambda x: x.get('COLUMN_ID', 0))
+            
+            # Mapeo de tipos de datos
+            type_mapping = {
+                'string': StringType(),
+                'int': IntegerType(),
+                'integer': IntegerType(),
+                'double': DoubleType(),
+                'float': DoubleType(),
+                'boolean': BooleanType(),
+                'date': DateType(),
+                'timestamp': TimestampType()
+            }
+            
+            # Crear el schema
+            fields = []
+            for col_spec in columns_specs:
+                column_name = col_spec['COLUMN_NAME']
+                data_type = col_spec.get('NEW_DATA_TYPE', 'string').lower()
+                
+                # Obtener el tipo de dato de Spark correspondiente
+                spark_type = type_mapping.get(data_type, StringType())
+                
+                fields.append(StructField(column_name, spark_type, True))
+            
+            schema = StructType(fields)
+            
+            # Crear DataFrame vacío con el schema
+            empty_df = self.spark.createDataFrame([], schema)
+            
+            logger.info(f"DataFrame vacío creado para tabla {table_name} con {len(fields)} columnas")
+            return empty_df
+            
+        except Exception as e:
+            logger.error(f"Error creando DataFrame vacío desde DynamoDB para tabla {table_name}: {str(e)}")
+            # En caso de error, devolver un DataFrame completamente vacío
+            return self.spark.createDataFrame([], StructType([]))
+            
     def get_now_lima_datetime(self):
         return NOW_LIMA
 
@@ -146,35 +215,41 @@ class SPARK_CONTROLLER():
                 table = dynamodb_resource.Table(DYNAMODB_DATABASE_NAME)
                 # Escaneo con filtro
                 response = table.scan(
-                    FilterExpression=Attr('DATA_SOURCE').is_in(DATA_SOURCES) & 
+                    FilterExpression=Attr('DATA_SOURCE').eq('apdayc') & 
                                     Attr('TEAM').eq(TEAM)
                 )
 
-                allowed_countrys = []
+                items = []
                 for item in response.get('Items', []):
                     if have_principal:
                         if not item.get('IS_PRINCIPAL', False):
                             continue
-                    id_pais = item['ENDPOINT_NAME'] 
-                    cod_pais = INSTANCIAS.split(",")
-                    for pais in cod_pais:
-                        if id_pais.startswith(pais):
-                            allowed_countrys.append(id_pais)
+                    if item['INSTANCE'] == INSTANCIAS.split(",")[0]:
+                        items.append(item['ENDPOINT_NAME'])
                 
                 df_list = []
-                for carpeta in allowed_countrys:
+                table_exists_somewhere = False
+                
+                for carpeta in items:
                     try:
                         carpeta_path = f"{path}{carpeta}/{table_name}/"
                         print(f"Leyendo archivos desde: {carpeta_path}")
-                        # Leer archivos con PySpark (modifica el formato si es necesario)
-                        df_tmp = self.spark.read.format("delta").load(carpeta_path)
-                        df_list.append(df_tmp)
+                        # Verificar si existe la tabla usando DeltaTable
+                        if DeltaTable.isDeltaTable(self.spark, carpeta_path):
+                            df_tmp = self.spark.read.format("delta").load(carpeta_path)
+                            df_list.append(df_tmp)
+                            table_exists_somewhere = True
                     except Exception as e:
-                        logger.error(f"cant read table {table_name}")
-                        logger.error(e)
+                        logger.warning(f"No se pudo leer la tabla {table_name} desde {carpeta}: {str(e)}")
+                        continue
 
-                # Unir todos los DataFrames en uno solo si hay más de una carpeta
-                df = df_list[0] if len(df_list) == 1 else df_list[0].unionByName(*df_list[1:])
+                # Si no se encontró ninguna tabla, crear DataFrame vacío con schema de DynamoDB
+                if not table_exists_somewhere:
+                    logger.warning(f"Tabla {table_name} no existe en ninguna ubicación. Creando DataFrame vacío con schema de DynamoDB.")
+                    df = self._create_empty_dataframe_from_dynamodb(table_name)
+                else:
+                    # Unir todos los DataFrames en uno solo si hay más de una carpeta
+                    df = df_list[0] if len(df_list) == 1 else df_list[0].unionByName(*df_list[1:])
 
             else:
                 df = self.spark.read.format("delta").load(s3_path)

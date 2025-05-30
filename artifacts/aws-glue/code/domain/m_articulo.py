@@ -19,9 +19,9 @@ try:
     m_sabor =  spark_controller.read_table(data_paths.APDAYC, "m_sabor", cod_pais=cod_pais)
     m_categoria =  spark_controller.read_table(data_paths.APDAYC, "m_categoria", cod_pais=cod_pais)
     m_tipo_envase =  spark_controller.read_table(data_paths.APDAYC, "m_tipo_envase", cod_pais=cod_pais)
-    m_aroma =  spark_controller.read_table(data_paths.APDAYC, "m_aroma", cod_pais=cod_pais)
-    m_gasificado =  spark_controller.read_table(data_paths.APDAYC, "m_gasificado", cod_pais=cod_pais)
-    m_unidad_negocio =  spark_controller.read_table(data_paths.APDAYC, "m_unidad_negocio", cod_pais=cod_pais)
+    #m_aroma =  spark_controller.read_table(data_paths.APDAYC, "m_aroma", cod_pais=cod_pais)
+    #m_gasificado =  spark_controller.read_table(data_paths.APDAYC, "m_gasificado", cod_pais=cod_pais)
+    #m_unidad_negocio =  spark_controller.read_table(data_paths.APDAYC, "m_unidad_negocio", cod_pais=cod_pais)
 
     target_table_name = "m_articulo"  
     
@@ -89,24 +89,6 @@ try:
             & (col("ma.cod_tipo_envase") == col("mte.cod_tipo_envase")),
             "left",
         ) \
-        .join(
-            m_aroma.alias("mar"),
-            (col("ma.cod_compania") == col("mar.cod_compania"))
-            & (col("ma.cod_aroma") == col("mar.cod_aroma")),
-            "left",
-        ) \
-        .join(
-            m_gasificado.alias("mga"),
-            (col("ma.cod_compania") == col("mga.cod_compania"))
-            & (col("ma.cod_gasificado") == col("mga.cod_gasificado")),
-            "left",
-        ) \
-        .join(
-            m_unidad_negocio.alias("mun"),
-            (col("ma.cod_compania") == col("mun.cod_compania")) &
-            (col("ma.cod_unidad_negocio") == col("mun.cod_unidad_negocio")),
-            "left",
-        ) \
         .where(col("mp.id_pais").isin(cod_pais)) \
         .select(
             concat(
@@ -146,10 +128,10 @@ try:
             coalesce(col("mpr.desc_presentacion"), lit("PRESENTACION DEFAULT")).cast(StringType()).alias("desc_presentacion"),
             coalesce(col("mte.cod_tipo_envase"), lit("000")).cast(StringType()).alias("cod_tipo_envase"),
             coalesce(col("mte.desc_tipo_envase"), lit("TIPO ENVASE DEFAULT")).cast(StringType()).alias("desc_tipo_envase"),
-            coalesce(col("mar.cod_aroma"), lit("000")).cast(StringType()).alias("cod_aroma"),
-            coalesce(col("mar.desc_aroma"), lit("AROMA DEFAULT")).cast(StringType()).alias("desc_aroma"),
-            coalesce(col("mga.cod_gasificado"), lit("000")).cast(StringType()).alias("cod_gasificado"),
-            coalesce(col("mga.desc_gasificado"), lit("GASIFICADO DEFAULT")).cast(StringType()).alias("desc_gasificado"),
+            lit("000").cast(StringType()).alias("cod_aroma"),
+            lit("AROMA DEFAULT").cast(StringType()).alias("desc_aroma"),
+            lit("000").cast(StringType()).alias("cod_gasificado"),
+            lit("GASIFICADO DEFAULT").cast(StringType()).alias("desc_gasificado"),
             coalesce(col("ml.cod_linea"), lit("00")).cast(StringType()).alias("cod_linea"),
             coalesce(col("ml.desc_linea"), lit("LINEA DEFAULT")).cast(StringType()).alias("desc_linea"),
             coalesce(col("ml.flg_linea"), lit("N")).cast(StringType()).alias("flg_linea"),
@@ -158,8 +140,8 @@ try:
             coalesce(col("mf.desc_familia"), lit("FAMILIA DEFAULT")).cast(StringType()).alias("desc_familia"),
             coalesce(col("ms.cod_subfamilia"), lit("00")).cast(StringType()).alias("cod_subfamilia"),
             coalesce(col("ms.desc_subfamilia"), lit("SUBFAMILIA DEFAULT")).cast(StringType()).alias("desc_subfamilia"),
-            col("mun.cod_unidad_negocio").cast(StringType()).alias("cod_unidad_negocio"),
-            col("mun.desc_unidad_negocio").cast(StringType()).alias("desc_unidad_negocio"),
+            lit(None).cast(StringType()).alias("cod_unidad_negocio"),
+            lit(None).cast(StringType()).alias("desc_unidad_negocio"),
             when(
                 (coalesce(col("ml.cod_linea"), lit("00")) == "03")
                 & (coalesce(col("mf.cod_familia"), lit("000")) == "003"),
