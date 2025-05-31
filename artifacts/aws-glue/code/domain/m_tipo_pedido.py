@@ -1,23 +1,20 @@
 import datetime as dt
-from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths, COD_PAIS
+from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths
 from pyspark.sql.functions import col, concat, lit, coalesce, when, trim, row_number,current_date,upper
 from pyspark.sql.types import StringType,TimestampType
 
 spark_controller = SPARK_CONTROLLER() 
+target_table_name = "m_tipo_pedido"
 try:
-    cod_pais = COD_PAIS.split(",") 
-    df_m_documento_transaccion = spark_controller.read_table(
-        data_paths.APDAYC, "m_documento_transaccion", cod_pais=cod_pais
-    )
-    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais,have_principal = True)
-    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
- 
-    target_table_name = "m_tipo_pedido"
+    df_m_documento_transaccion = spark_controller.read_table(data_paths.APDAYC, "m_documento_transaccion")
+    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", have_principal = True)
+    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania" )
 except Exception as e:
-    logger.error(e)
-    raise 
+    logger.error(f"Error reading tables: {e}")
+    raise ValueError(f"Error reading tables: {e}")
 try:
-    tmp_m_tipo_pedido = (
+    logger.info("Starting creation of df_m_tipo_pedido")
+    df_dom_m_tipo_pedido = (
         df_m_documento_transaccion.alias("a")
         .join(
             df_m_compania.alias("e"),
@@ -25,7 +22,6 @@ try:
             "inner",
         )
         .join(df_m_pais.alias("mp"), col("e.cod_pais") == col("mp.cod_pais"), "inner")
-        .where(col("mp.id_pais").isin(cod_pais))
         .select(
             concat(
                 trim(col("a.cod_compania")),
@@ -42,8 +38,9 @@ try:
 
     id_columns = ["id_tipo_pedido"]
     partition_columns_array = ["id_pais"]
-    spark_controller.upsert(tmp_m_tipo_pedido, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
- 
+    logger.info(f"starting upsert of {target_table_name}")
+    spark_controller.upsert(df_dom_m_tipo_pedido, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
+    logger.info(f"Upsert of {target_table_name} finished")
 except Exception as e:
-    logger.error(str(e))
-    raise
+    logger.error(f"Error processing df_m_tipo_pedido: {e}")
+    raise ValueError(f"Error processing df_m_tipo_pedido: {e}")

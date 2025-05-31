@@ -1,26 +1,22 @@
-from common_jobs_functions import data_paths, logger, COD_PAIS, SPARK_CONTROLLER
+from common_jobs_functions import data_paths, logger, SPARK_CONTROLLER
 from pyspark.sql.functions import col, concat_ws, date_format, desc, row_number
 from pyspark.sql.window import Window
 
 spark_controller = SPARK_CONTROLLER()
-
+target_table_name = "t_reparto"
 try:
-    cod_pais = COD_PAIS.split(",")
     periodos= spark_controller.get_periods()
     logger.info(periodos)
 
-    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais, have_principal=True)
-    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
-    t_movimiento_inventario = spark_controller.read_table(data_paths.APDAYC, "t_movimiento_inventario", cod_pais=cod_pais)
-
-    target_table_name = "t_reparto"
+    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", have_principal=True)
+    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania")
+    t_movimiento_inventario = spark_controller.read_table(data_paths.APDAYC, "t_movimiento_inventario")
 
 except Exception as e:
-    logger.error(e)
-    raise
+    logger.error(f"Error reading tables: {e}")
+    raise ValueError(f"Error reading tables: {e}")
 
 try:
-    m_pais = m_pais.filter(col("id_pais").isin(cod_pais))
     df_m_compania = (
         m_compania.alias("mc")
         .join(m_pais.alias("mp"), col("mp.cod_pais") == col("mc.cod_pais"), "inner")
@@ -61,7 +57,7 @@ try:
         )
     )
 
-    tmp = tmp_final.select(
+    df_dom_t_reparto = tmp_final.select(
         col("id_pais").cast("string").alias("id_pais"),
         col("id_periodo").cast("string").alias("id_periodo"),
         col("id_reparto").cast("string").alias("id_reparto"),
@@ -77,9 +73,10 @@ try:
     )
 
     partition_columns_array = ["id_pais", "id_periodo"]
-    spark_controller.write_table(tmp, data_paths.DOMAIN, target_table_name, partition_columns_array)
-
+    logger.info(f"starting upsert of {target_table_name}")
+    spark_controller.write_table(df_dom_t_reparto, data_paths.DOMAIN, target_table_name, partition_columns_array)
+    logger.info(f"Upsert of {target_table_name} finished") 
 
 except Exception as e:
-    logger.error(e)
-    raise
+    logger.error(f"Error processing df_t_reparto: {e}")
+    raise ValueError(f"Error processing df_t_reparto: {e}")

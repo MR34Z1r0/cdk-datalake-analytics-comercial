@@ -30,7 +30,7 @@ try:
         (col("mc.cod_pais") == col("mp.cod_pais")) & (col("mc.id_pais") == col("mp.id_pais")),
         "inner",
     )
-       # .join(
+    # .join(
     #     df_conf_origen.alias("co"),
     #     (col("co.id_pais") == col("mp.id_pais")) &
     #     (col("co.nombre_tabla") == lit("m_fuerza_venta")) &
