@@ -15,7 +15,6 @@ try:
     df_dom_m_compania = (
         m_compania.alias("mc")
         .join(m_pais.alias("mp"), col("mc.cod_pais") == col("mp.cod_pais"), "inner")
-        .where(col("mp.id_pais").isin(cod_pais))
         .select(
             col("mc.cod_compania").cast(StringType()).alias("id_compania"),
             #col("sc.id").cast(StringType()).alias("id_compania_ref"),

@@ -130,22 +130,39 @@ class SPARK_CONTROLLER():
                 raise ValueError(f"No hay instancias definidas para la tabla {table_name}")
 
             # Conectar a la tabla de especificaciones de columnas
+            database_table = dynamodb_resource.Table(DYNAMODB_DATABASE_NAME)
             columns_table = dynamodb_resource.Table(DYNAMODB_COLUMNS_NAME)
             
+            # Buscar las especificaciones de la Base de Datos
+            logger.info(f"Buscando especificaciones de base de datos para la tabla {table_name} y el equipo {TEAM}")
+            response = database_table.scan(
+                FilterExpression=Attr('TEAM').eq(TEAM) & 
+                            Attr('IS_PRINCIPAL').eq(True) & 
+                            Attr('DATA_SOURCE').is_in(DATA_SOURCES) &
+                            Attr('INSTANCE').eq(INSTANCES[0])
+            )
+
+            items = response.get('Items', [])
+            if len(items) == 0:
+                logger.error(f"No se encontraron especificaciones de base de datos para la instancia {INSTANCES[0]} y el equipo {TEAM}")
+                # Crear un DataFrame vacío básico si no hay especificaciones
+                raise ValueError(f"No se encontraron especificaciones de base de datos para la instancia {INSTANCES[0]} y el equipo {TEAM}")
+            
+            ENDPOINT_NAME = items[0]['ENDPOINT_NAME']
+            logger.info(f"Endpoint name: {ENDPOINT_NAME}")
             # Buscar las especificaciones de la tabla
+            logger.info(f"Buscando especificaciones de columnas para la tabla {table_name} en el endpoint {ENDPOINT_NAME}")
             response = columns_table.scan(
                 FilterExpression=Attr('TABLE_NAME').eq(table_name.upper()) & 
                             Attr('TEAM').eq(TEAM) & 
-                            Attr('IS_PRINCIPAL').eq(True) & 
-                            Attr('INSTANCE').eq(INSTANCES[0])
+                            Attr('DATA_SOURCE').is_in(DATA_SOURCES) &
+                            Attr('ENDPOINT').eq(ENDPOINT_NAME)
             )
 
             items = []
             for item in response.get('Items', []):
-                for INSTANCE in INSTANCIAS.split(","):
-                    if item['INSTANCE'] == INSTANCE:
-                        items.append(item)
-
+                items.append(item)
+            logger.info(f"Se encontraron {len(items)} especificaciones de columnas para la tabla {table_name} en el endpoint {ENDPOINT_NAME}")
             if len(items) == 0:
                 logger.error(f"No se encontraron especificaciones de columnas para la tabla {table_name}")
                 # Crear un DataFrame vacío básico si no hay especificaciones
@@ -177,6 +194,8 @@ class SPARK_CONTROLLER():
                 
                 fields.append(StructField(column_name, spark_type, True))
             
+            logger.info(f"Se han encontrado {len(fields)} columnas para la tabla {table_name} con los siguientes tipos: {[f.name + ':' + f.dataType.simpleString() for f in fields]}")
+
             schema = StructType(fields)
             
             # Crear DataFrame vacío con el schema
