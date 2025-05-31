@@ -4,7 +4,7 @@ from pyspark.sql.functions import col, concat, lit, coalesce, when
 from pyspark.sql.types import StringType, IntegerType, DecimalType, TimestampType
 
 spark_controller = SPARK_CONTROLLER()
-
+target_table_name = "m_articulo"    
 try:
     m_articulo =  spark_controller.read_table(data_paths.APDAYC, "m_articulo")
     m_pais =  spark_controller.read_table(data_paths.APDAYC, "m_pais", have_principal = True)
@@ -21,7 +21,6 @@ try:
     #m_aroma =  spark_controller.read_table(data_paths.APDAYC, "m_aroma")
     #m_gasificado =  spark_controller.read_table(data_paths.APDAYC, "m_gasificado")
     #m_unidad_negocio =  spark_controller.read_table(data_paths.APDAYC, "m_unidad_negocio")
-    target_table_name = "m_articulo"    
 except Exception as e:
     logger.error(f"Error reading tables: {e}")
     raise ValueError(f"Error reading tables: {e}")

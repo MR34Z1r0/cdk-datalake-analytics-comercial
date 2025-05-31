@@ -1,27 +1,24 @@
 import datetime as dt
-from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths, COD_PAIS
-from pyspark.sql.functions import col, concat, lit, coalesce, when, split , trim , current_date, max,row_number,lower,to_date
+from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths
+from pyspark.sql.functions import col, concat, lit, coalesce, when, split , trim , current_date, max, row_number, lower, to_date
 from pyspark.sql.types import StringType, DateType
 from pyspark.sql.window import Window
 
 spark_controller = SPARK_CONTROLLER() 
 target_table_name = "m_cliente"   
 try:
-    cod_pais = COD_PAIS.split(",") 
-    df_m_cliente = spark_controller.read_table(data_paths.APDAYC, "m_cliente", cod_pais=cod_pais)
-    df_m_estructura_cliente = spark_controller.read_table(data_paths.APDAYC, "m_asignacion_modulo", cod_pais=cod_pais)
-    df_m_tipo_cliente = spark_controller.read_table(data_paths.APDAYC, "m_tipo_cliente", cod_pais=cod_pais)
-    df_m_cuenta_clave = spark_controller.read_table(data_paths.APDAYC, "m_cuenta_clave", cod_pais=cod_pais)
-    df_m_canal = spark_controller.read_table(data_paths.APDAYC, "m_canal", cod_pais=cod_pais)
-    df_m_giro = spark_controller.read_table(data_paths.APDAYC, "m_giro", cod_pais=cod_pais)
-    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
-    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais,have_principal = True)
- 
+    df_m_cliente = spark_controller.read_table(data_paths.APDAYC, "m_cliente")
+    df_m_estructura_cliente = spark_controller.read_table(data_paths.APDAYC, "m_asignacion_modulo")
+    df_m_tipo_cliente = spark_controller.read_table(data_paths.APDAYC, "m_tipo_cliente")
+    df_m_cuenta_clave = spark_controller.read_table(data_paths.APDAYC, "m_cuenta_clave")
+    df_m_canal = spark_controller.read_table(data_paths.APDAYC, "m_canal")
+    df_m_giro = spark_controller.read_table(data_paths.APDAYC, "m_giro")
+    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania")
+    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", have_principal = True)
 except Exception as e:
-    logger.info(str(e))
-    raise 
-try:
-    
+    logger.error(f"Error reading tables: {e}")
+    raise ValueError(f"Error reading tables: {e}")  
+try:    
     df_tmp_estructura_cliente = (
         df_m_cliente.alias("mcl")
         .join(
@@ -51,7 +48,7 @@ try:
         )
     )
   
-    df_tmp_cliente = (
+    df_dom_m_cliente = (
         df_m_cliente.alias("mc")
         .join(
             df_m_tipo_cliente.alias("tc"),
@@ -90,8 +87,7 @@ try:
             (col("mco.cod_compania") == col("mc.cod_compania")),
             "inner",
         )
-        .join(df_m_pais.alias("mp"), col("mco.cod_pais") == col("mp.cod_pais"), "inner")        
-        .where(col("mp.id_pais").isin(cod_pais))
+        .join(df_m_pais.alias("mp"), col("mco.cod_pais") == col("mp.cod_pais"), "inner")
         .select(
             concat(
                 trim(col("mc.cod_compania")),
@@ -163,8 +159,8 @@ try:
     id_columns = ["id_cliente"]
     partition_columns_array = ["id_pais"]
     logger.info(f"starting upsert of {target_table_name}")
-    spark_controller.upsert(df_tmp_cliente, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
-
+    spark_controller.upsert(df_dom_m_cliente, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
+    logger.info(f"Upsert de {target_table_name} completado exitosamente")
 except Exception as e:
-    logger.info(e)
-    raise
+    logger.error(f"Error processing df_dom_m_cliente: {e}")
+    raise ValueError(f"Error processing df_dom_m_cliente: {e}") 

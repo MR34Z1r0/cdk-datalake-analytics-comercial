@@ -1,25 +1,20 @@
 import datetime as dt
-from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths, COD_PAIS
+from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths
 from pyspark.sql.functions import col, lit, current_date, concat, trim, max
 from pyspark.sql.types import StringType, DateType
 
 spark_controller = SPARK_CONTROLLER()
-
+target_table_name = "m_clasificacion_cliente"
 try:
-    cod_pais = COD_PAIS.split(",")
-
-    i_relacion_consumo = spark_controller.read_table(data_paths.APDAYC, "i_relacion_consumo", cod_pais=cod_pais)
-    m_canal_visibilidad = spark_controller.read_table(data_paths.APDAYC, "m_canal", cod_pais=cod_pais)
-    m_subgiro_visibilidad = spark_controller.read_table(data_paths.APDAYC, "m_subgiro", cod_pais=cod_pais)
-    m_giro_visibilidad = spark_controller.read_table(data_paths.APDAYC, "m_giro", cod_pais=cod_pais)
-    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
-    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais, have_principal=True) 
-
-    target_table_name = "m_clasificacion_cliente"
-
+    i_relacion_consumo = spark_controller.read_table(data_paths.APDAYC, "i_relacion_consumo")
+    m_canal_visibilidad = spark_controller.read_table(data_paths.APDAYC, "m_canal")
+    m_subgiro_visibilidad = spark_controller.read_table(data_paths.APDAYC, "m_subgiro")
+    m_giro_visibilidad = spark_controller.read_table(data_paths.APDAYC, "m_giro")
+    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania")
+    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", have_principal=True)
 except Exception as e:
-    raise
-
+    logger.error(f"Error reading tables: {e}")
+    raise ValueError(f"Error reading tables: {e}")  
 try:
     df_subgiro = (
         i_relacion_consumo.alias("irc")
@@ -30,7 +25,6 @@ try:
             (col("mgv.cod_subgiro") == col("irc.cod_subgiro")) & (col("mgv.cod_compania") == col("irc.cod_compania")),
             "inner",
         )
-        .where(col("mp.id_pais").isin(cod_pais))
         .select(
             col("mp.id_pais").alias("id_pais"), 
             concat(trim(col("irc.cod_compania")), lit("|"), lit("SG"), lit("|"), trim(col("irc.cod_subgiro"))).alias("id_clasificacion_cliente"),
@@ -53,7 +47,6 @@ try:
             (col("mgv.cod_giro") == col("irc.cod_giro")) & (col("mgv.cod_compania") == col("irc.cod_compania")),
             "inner",
         )
-        .where(col("mp.id_pais").isin(cod_pais))
         .select(
             col("mp.id_pais").alias("id_pais"), 
             concat(trim(col("irc.cod_compania")), lit("|"), lit("GR"), lit("|"), trim(col("irc.cod_giro"))).alias("id_clasificacion_cliente"),
@@ -93,7 +86,7 @@ try:
     df_giro = df_giro.distinct()
     df_canal = df_canal.distinct()
 
-    df_m_clasificacion_cliente = (
+    df_dom_m_clasificacion_cliente = (
         df_subgiro.union(df_giro).union(df_canal)
         .select(
             col("id_pais").cast(StringType()).alias("id_pais"),
@@ -111,8 +104,8 @@ try:
     id_columns = ["id_clasificacion_cliente"]
     partition_columns_array = ["id_pais"]
     logger.info(f"starting upsert of {target_table_name}")
-    spark_controller.upsert(df_m_clasificacion_cliente, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
-
+    spark_controller.upsert(df_dom_m_clasificacion_cliente, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
+    logger.info(f"Upsert de {target_table_name} completado exitosamente")
 except Exception as e:
-    logger.error(e)
-    raise
+    logger.error(f"Error processing df_dom_m_clasificacion_cliente: {e}")
+    raise ValueError(f"Error processing df_dom_m_clasificacion_cliente: {e}") 
