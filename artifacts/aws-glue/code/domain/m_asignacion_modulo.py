@@ -1,25 +1,20 @@
 import datetime as dt
-from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths, COD_PAIS
+from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths
 from pyspark.sql.functions import col, lit, regexp_replace, trim, coalesce, when, substring, concat, current_date
 from pyspark.sql.types import StringType, IntegerType, DateType, TimestampType
 
 spark_controller = SPARK_CONTROLLER()
 
 try:
-    cod_pais = COD_PAIS.split(",") 
-
-    m_asignacion_modulo = spark_controller.read_table(data_paths.APDAYC, "m_asignacion_modulo", cod_pais=cod_pais)
-    m_sucursal = spark_controller.read_table(data_paths.APDAYC, "m_sucursal", cod_pais=cod_pais)
-    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais, have_principal=True)
-    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
-    m_cliente = spark_controller.read_table(data_paths.APDAYC, "m_cliente", cod_pais=cod_pais)
-
-    target_table_name = "m_asignacion_modulo"
-    
+    m_asignacion_modulo = spark_controller.read_table(data_paths.APDAYC, "m_asignacion_modulo")
+    m_sucursal = spark_controller.read_table(data_paths.APDAYC, "m_sucursal")
+    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", have_principal=True)
+    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania")
+    m_cliente = spark_controller.read_table(data_paths.APDAYC, "m_cliente")
+    target_table_name = "m_asignacion_modulo"    
 except Exception as e:
-    logger.error(f"Error al leer tablas: {e}")
-    raise
-
+    logger.error(f"Error reading tables: {e}")
+    raise ValueError(f"Error reading tables: {e}")    
 try:
     tmp_asignacion_modulo = m_asignacion_modulo.alias("mm") \
         .join(
@@ -44,7 +39,6 @@ try:
             col("comp.cod_pais") == col("mp.cod_pais"),
             "inner"
         ) \
-        .where(col("mp.id_pais").isin(cod_pais)) \
         .select(
             concat(
                 trim(col("mm.cod_compania")),
@@ -90,13 +84,8 @@ try:
             current_date().alias("fecha_creacion"),
             current_date().alias("fecha_modificacion")
         )
-    
-except Exception as e:
-    logger.error(f"Error en transformación de datos: {e}")
-    raise
 
-try:
-    df_tmp_asignacion_modulo = tmp_asignacion_modulo.alias("mam") \
+    df_dom_m_asignacion_modulo = tmp_asignacion_modulo.alias("mam") \
         .select(
             col("mam.id_asignacion_modulo").cast(StringType()).alias("id_asignacion_modulo"),
             col("mam.id_pais").cast(StringType()).alias("id_pais"),
@@ -112,13 +101,12 @@ try:
             col("mam.fecha_creacion").cast(TimestampType()).alias("fecha_creacion"), 
             col("mam.fecha_modificacion").cast(TimestampType()).alias("fecha_modificacion")
         )
-    
+
     id_columns = ["id_asignacion_modulo"]
     partition_columns_array = ["id_pais"]
-    logger.info(f"Iniciando upsert de {target_table_name}")
-    spark_controller.upsert(df_tmp_asignacion_modulo, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
+    logger.info(f"starting upsert of {target_table_name}")
+    spark_controller.upsert(df_dom_m_asignacion_modulo, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
     logger.info(f"Upsert de {target_table_name} completado exitosamente")
-
 except Exception as e:
-    logger.error(f"Error en upsert: {e}")
-    raise
+    logger.error(f"Error processing df_dom_m_asignacion_modulo: {e}")
+    raise ValueError(f"Error processing df_dom_m_asignacion_modulo: {e}") 

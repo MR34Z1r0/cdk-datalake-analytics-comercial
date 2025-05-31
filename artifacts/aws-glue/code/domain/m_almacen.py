@@ -31,6 +31,7 @@ try:
     partition_columns_array = ["id_pais"]
     logger.info(f"starting upsert of {target_table_name}")
     spark_controller.upsert(df_dom_m_almacen, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
+    logger.info(f"Upsert de {target_table_name} completado exitosamente")
 except Exception as e:
     logger.error(f"Error processing df_m_almacen: {e}")
     raise ValueError(f"Error processing df_m_almacen: {e}") 
