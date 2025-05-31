@@ -1,29 +1,27 @@
 import datetime as dt
-from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths, COD_PAIS
+from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths
 from pyspark.sql.functions import col, concat, lit, coalesce, when, trim, row_number,current_date,upper
 from pyspark.sql.types import StringType, DateType
 
 spark_controller = SPARK_CONTROLLER()
+target_table_name = "m_tipo_venta"
 try:
-    cod_pais = COD_PAIS.split(",")
+    df_m_tipo_documento = spark_controller.read_table(data_paths.APDAYC, "m_tipo_documento")
+    df_m_procedimiento = spark_controller.read_table(data_paths.APDAYC, "m_procedimiento")
+    df_m_tipo_transaccion = spark_controller.read_table(data_paths.APDAYC, "m_tipo_transaccion")
+    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais",have_principal = True)
+    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania")
  
-    df_m_tipo_documento = spark_controller.read_table(data_paths.APDAYC, "m_tipo_documento", cod_pais=cod_pais)
-    df_m_procedimiento = spark_controller.read_table(data_paths.APDAYC, "m_procedimiento", cod_pais=cod_pais)
-    df_m_tipo_transaccion = spark_controller.read_table(data_paths.APDAYC, "m_tipo_transaccion", cod_pais=cod_pais)
-    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais,have_principal = True)
-    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
- 
-    target_table_name = "m_tipo_venta"
-
 except Exception as e:
-    logger.error(e)
-    raise 
+    logger.error(f"Error reading tables: {e}")
+    raise ValueError(f"Error reading tables: {e}") 
 try:
     st_tipo_transaccion = df_m_tipo_transaccion.where(
         col("cod_tipo_transaccion") == "DCV"
     ).select(col("cod_compania"), col("cod_documento_transaccion"))
 
-    tmp_m_tipo_venta = (
+    logger.info("Starting creation of df_m_tipo_venta")
+    df_m_tipo_venta = (
         df_m_procedimiento.alias("d")
         .join(
             df_m_tipo_documento.alias("c"),
@@ -43,7 +41,6 @@ try:
             & (col("c.cod_tipo_documento") == col("tt.cod_documento_transaccion")),
             "inner",
         )
-        .where(col("mp.id_pais").isin(cod_pais))
         .select(
             concat(
                 trim(col("d.cod_compania")),
@@ -63,8 +60,9 @@ try:
 
     id_columns = ["id_tipo_venta"]
     partition_columns_array = ["id_pais"]
-    spark_controller.upsert(tmp_m_tipo_venta, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
-
+    logger.info(f"starting upsert of {target_table_name}") 
+    spark_controller.upsert(df_m_tipo_venta, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
+    logger.info(f"Upsert of {target_table_name} finished")
 except Exception as e:
-    logger.error(e)
-    raise
+    logger.error(f"Error processing df_m_tipo_venta: {e}")
+    raise ValueError(f"Error processing df_m_tipo_venta: {e}")
