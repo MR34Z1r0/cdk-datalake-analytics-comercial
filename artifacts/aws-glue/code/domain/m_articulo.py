@@ -86,7 +86,6 @@ try:
             & (col("ma.cod_tipo_envase") == col("mte.cod_tipo_envase")),
             "left",
         ) \
-        .where(col("mp.id_pais").isin(cod_pais)) \
         .select(
             concat(
                 col("ma.cod_compania"),

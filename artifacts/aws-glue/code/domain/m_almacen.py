@@ -16,7 +16,6 @@ try:
         df_m_almacen.alias("ma")
         .join(df_m_compania.alias("mc"), col("mc.cod_compania") == col("ma.cod_compania"), "inner")
         .join(df_m_pais.alias("mp"), col("mp.cod_pais") == col("mc.cod_pais"), "inner")
-        .where(col("mp.id_pais").isin(cod_pais))
         .select(
             col("ma.id_almacen").cast("string").alias("id_almacen"),
             col("mp.id_pais").cast("string").alias("id_pais"),
