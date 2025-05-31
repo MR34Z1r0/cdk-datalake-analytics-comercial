@@ -1,23 +1,20 @@
 import datetime as dt
-from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths, COD_PAIS
+from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths
 from pyspark.sql.functions import col, concat, lit, coalesce, when, trim, row_number,current_date,upper
 from pyspark.sql.types import StringType, DateType
-spark_controller = SPARK_CONTROLLER() 
-try: 
-    cod_pais = COD_PAIS.split(",")
-    
-    df_m_lista_precio = spark_controller.read_table(data_paths.APDAYC, "m_lista_precio", cod_pais=cod_pais)
-    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais,have_principal = True)
-    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
- 
-    #df_conf_origen = spark_controller.read_table(data_paths.DOMAIN, "conf_origen")
 
-    target_table_name = "m_lista_precio" 
+spark_controller = SPARK_CONTROLLER()
+target_table_name = "m_lista_precio"  
+try: 
+    df_m_lista_precio = spark_controller.read_table(data_paths.APDAYC, "m_lista_precio")
+    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais",have_principal = True)
+    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania")
 except Exception as e:
-    logger.error(e)
-    raise
+    logger.error(f"Error reading tables: {e}")
+    raise ValueError(f"Error reading tables: {e}")
 try:
-    tmp1 = (
+    logger.info("Starting creation of df_dom_m_lista_precio")
+    df_dom_m_lista_precio = (
         df_m_lista_precio.alias("mlp")
         .join(
             df_m_compania.alias("mc"),
@@ -29,14 +26,6 @@ try:
             (col("mc.cod_pais") == col("mp.cod_pais")) & (col("mc.id_pais") == col("mp.id_pais")), 
             "inner"
         )
-        #.join(
-        #    df_conf_origen.alias("co"),
-        #    (col("co.id_pais") == col("mp.id_pais"))
-        #    & (col("co.nombre_tabla") == "m_lista_precio")
-        #    & (col("co.nombre_origen") == "bigmagic"),
-        #    "inner",
-        #)
-        .where(col("mp.id_pais").isin(cod_pais))
         .select(
             concat(
                 trim(col("mlp.cod_compania")),
@@ -50,15 +39,13 @@ try:
             current_date().cast(DateType()).alias("fecha_modificacion"),
         )
     ) 
-    
-    tmp_m_lista_precio = tmp1
 
     id_columns = ["id_lista_precio"]
     partition_columns_array = ["id_pais"]
     logger.info(f"starting upsert of {target_table_name}")
-    spark_controller.upsert(tmp_m_lista_precio, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
-
+    spark_controller.upsert(df_dom_m_lista_precio, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
+    logger.info(f"Upsert of {target_table_name} finished")
 
 except Exception as e:
-    logger.error(str(e))
-    raise
+    logger.error(f"Error processing df_dom_m_lista_precio: {e}")
+    raise ValueError(f"Error processing df_dom_m_lista_precio: {e}")

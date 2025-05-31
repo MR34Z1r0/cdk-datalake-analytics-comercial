@@ -1,24 +1,21 @@
 import datetime as dt
-from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths, COD_PAIS
+from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths
 from pyspark.sql.functions import col, concat, lit, coalesce, when, trim, row_number,current_date,upper
 from pyspark.sql.types import StringType
 
 spark_controller = SPARK_CONTROLLER()
+target_table_name = "m_fuerza_venta"
 try:
-    cod_pais = COD_PAIS.split(",")
-    df_m_fuerza_venta = spark_controller.read_table(data_paths.APDAYC, "m_fuerza_venta", cod_pais=cod_pais)
-    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais,have_principal = True)
-    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
-
-    #df_conf_origen = spark_controller.read_table(data_paths.DOMAIN, "conf_origen")
-
-    target_table_name = "m_fuerza_venta"
+    df_m_fuerza_venta = spark_controller.read_table(data_paths.APDAYC, "m_fuerza_venta")
+    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais",have_principal = True)
+    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania")
 
 except Exception as e:
-    logger.error(e)
-    raise
+    logger.error(f"Error reading tables: {e}")
+    raise ValueError(f"Error reading tables: {e}")
 try:
-    tmp1 = (
+    logger.info("Starting creation of df_m_fuerza_venta")
+    df_dom_m_fuerza_venta = (
     df_m_fuerza_venta.alias("mfv")
     .join(
         df_m_compania.alias("mc"),
@@ -30,14 +27,6 @@ try:
         (col("mc.cod_pais") == col("mp.cod_pais")) & (col("mc.id_pais") == col("mp.id_pais")),
         "inner",
     )
-    # .join(
-    #     df_conf_origen.alias("co"),
-    #     (col("co.id_pais") == col("mp.id_pais")) &
-    #     (col("co.nombre_tabla") == lit("m_fuerza_venta")) &
-    #     (col("co.nombre_origen") == lit("bigmagic")),
-    #     "inner",
-    # )
-    .where(col("mp.id_pais").isin(cod_pais))
     .select(
         concat(
             trim(col("mfv.cod_compania")),
@@ -51,13 +40,12 @@ try:
         col("mfv.desc_fuerza_venta").cast(StringType()).alias("desc_fuerza_venta")
     )
     )
-    tmp_m_fuerza_venta = tmp1
 
     id_columns = ["id_fuerza_venta"]
     partition_columns_array = ["id_pais"]
     logger.info(f"starting upsert of {target_table_name}")
-    spark_controller.upsert(tmp_m_fuerza_venta, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
-
+    spark_controller.upsert(df_dom_m_fuerza_venta, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
+    logger.info(f"Upsert of {target_table_name} finished")
 except Exception as e:
-    logger.error(str(e))
-    raise
+    logger.error(f"Error processing df_m_fuerza_venta: {e}")
+    raise ValueError(f"Error processing df_m_fuerza_venta: {e}")
