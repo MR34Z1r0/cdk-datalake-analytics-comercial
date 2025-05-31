@@ -1,20 +1,18 @@
-from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths, COD_PAIS
+from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths 
 from pyspark.sql.functions import col
 
 spark_controller = SPARK_CONTROLLER()
 target_table_name = "m_almacen"
 try:
-    cod_pais = COD_PAIS.split(",")
-    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
-    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais,have_principal = True)
-    df_m_almacen = spark_controller.read_table(data_paths.APDAYC, "m_almacen", cod_pais=cod_pais)
+    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania")
+    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", have_principal = True)
+    df_m_almacen = spark_controller.read_table(data_paths.APDAYC, "m_almacen")
 except Exception as e:
-    logger.error(e)
-    raise
-
+    logger.error(f"Error reading tables: {e}")
+    raise ValueError(f"Error reading tables: {e}")
 try:
-    logger.info("Starting creation of tmp_dominio_m_almacen")
-    tmp_dominio_m_almacen = (
+    logger.info("Starting creation of df_m_almacen")
+    df_dom_m_almacen = (
         df_m_almacen.alias("ma")
         .join(df_m_compania.alias("mc"), col("mc.cod_compania") == col("ma.cod_compania"), "inner")
         .join(df_m_pais.alias("mp"), col("mp.cod_pais") == col("mc.cod_pais"), "inner")
@@ -33,7 +31,7 @@ try:
     id_columns = ["id_almacen"]
     partition_columns_array = ["id_pais"]
     logger.info(f"starting upsert of {target_table_name}")
-    spark_controller.upsert(tmp_dominio_m_almacen, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
+    spark_controller.upsert(df_dom_m_almacen, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
 except Exception as e:
-    logger.error(str(e))
-    raise
+    logger.error(f"Error processing df_m_almacen: {e}")
+    raise ValueError(f"Error processing df_m_almacen: {e}") 

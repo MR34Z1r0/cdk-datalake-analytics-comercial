@@ -71,6 +71,9 @@ class CdkDatalakeAnalyticsStack(Stack):
         )
         
         # Tablas DynamoDB usando aje-cdk-libs
+        self.dynamodb_columns_table = self.builder.import_dynamodb_table(
+            self.PROJECT_CONFIG.app_config["dynamodb_tables"]["columns-specifications"]
+        )
         self.dynamodb_configuration_table = self.builder.import_dynamodb_table(
             self.PROJECT_CONFIG.app_config["dynamodb_tables"]["configuration"]
         )
@@ -380,15 +383,16 @@ class CdkDatalakeAnalyticsStack(Stack):
             '--S3_PATH_EXTERNAL': f"s3a://{self.s3_external_bucket.bucket_name}/{self.PROJECT_CONFIG.app_config['team']}/",
             '--S3_PATH_ARTIFACTS': f"s3a://{self.s3_artifacts_bucket.bucket_name}/{self.Paths.AWS_ARTIFACTS_GLUE}/",
             '--S3_PATH_ARTIFACTS_CSV': f"s3a://{self.s3_artifacts_bucket.bucket_name}/{self.Paths.AWS_ARTIFACTS_GLUE_CSV}",
+            '--PROJECT_NAME': self.PROJECT_CONFIG.app_config["team"],
             '--TEAM': self.PROJECT_CONFIG.app_config['team'],
             '--BUSINESS_PROCESS': self.PROJECT_CONFIG.app_config['business_process'],
             '--REGION_NAME': self.PROJECT_CONFIG.region_name,
             '--DYNAMODB_DATABASE_NAME': self.dynamodb_credentials_table.table_name,
+            '--DYNAMODB_COLUMNS_NAME': self.dynamodb_columns_table.table_name,
             '--DYNAMODB_LOGS_TABLE': self.dynamodb_logs_table.table_name,
             '--COD_PAIS': 'PE',
             '--INSTANCIAS': 'PE',
             '--ERROR_TOPIC_ARN': self.sns_failed_topic.topic_arn,
-            '--PROJECT_NAME': self.PROJECT_CONFIG.app_config["team"],
             '--datalake-formats': "delta",
             '--enable-continuous-log-filter': "true",
             '--LOAD_PROCESS': '10',

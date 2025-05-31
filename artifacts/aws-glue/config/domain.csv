@@ -1,5 +1,4 @@
 id;layer;procedure;glue_version;worker_type;num_workers;exe_order;process_id;periods
-1;dominio;conf_origen;4;G.1X;2;0;10;2
 2;dominio;m_articulo;4;G.1X;2;1;10;2
 3;dominio;m_asignacion_modulo;4;G.1X;2;1;10;2
 4;dominio;m_clasificacion_cliente;4;G.1X;2;1;10;2
@@ -30,4 +29,3 @@ id;layer;procedure;glue_version;worker_type;num_workers;exe_order;process_id;per
 29;dominio;t_saldos_iniciales;4;G.1X;4;2;20;2
 30;dominio;t_reparto;4;G.1X;4;2;10;2
 31;dominio;t_pedido_detalle_cumplimiento;4;G.1X;4;2;10;2
-32;dominio;m_almacen;4;G.1X;2;1;10;2

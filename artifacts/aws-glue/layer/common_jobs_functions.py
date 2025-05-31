@@ -71,6 +71,7 @@ logger.info(f"project name: {PROJECT_NAME} | flow name:  {FLOW_NAME} | process n
 logger.info(f"INSTANCIAS: {INSTANCIAS}")
 
 DATA_SOURCES = ["apdayc"]
+INSTANCES = INSTANCIAS.split(",")
 
 s3 = boto3.client('s3')
 sns_client = boto3.client("sns")
@@ -123,14 +124,20 @@ class SPARK_CONTROLLER():
         para la tabla sofia-dev-datalake-columns-specifications-ddb
         """
         try:
+            if len(INSTANCES) == 0:
+                logger.error(f"No hay instancias definidas para la tabla {table_name}")
+                # Crear un DataFrame vacío básico si no hay especificaciones
+                raise ValueError(f"No hay instancias definidas para la tabla {table_name}")
+
             # Conectar a la tabla de especificaciones de columnas
             columns_table = dynamodb_resource.Table(DYNAMODB_COLUMNS_NAME)
             
             # Buscar las especificaciones de la tabla
             response = columns_table.scan(
-                FilterExpression=Attr('TABLE_NAME').eq(table_name) & 
+                FilterExpression=Attr('TABLE_NAME').eq(table_name.upper()) & 
                             Attr('TEAM').eq(TEAM) & 
-                            Attr('IS_PRINCIPAL').eq(True)
+                            Attr('IS_PRINCIPAL').eq(True) & 
+                            Attr('INSTANCE').eq(INSTANCES[0])
             )
 
             items = []
@@ -142,7 +149,7 @@ class SPARK_CONTROLLER():
             if len(items) == 0:
                 logger.error(f"No se encontraron especificaciones de columnas para la tabla {table_name}")
                 # Crear un DataFrame vacío básico si no hay especificaciones
-                return self.spark.createDataFrame([], StructType([]))
+                raise ValueError(f"No se encontraron especificaciones de columnas para la tabla {table_name}")
             
             # Ordenar por COLUMN_ID para mantener el orden correcto
             columns_specs = sorted(items, key=lambda x: x.get('COLUMN_ID', 0))
@@ -181,26 +188,10 @@ class SPARK_CONTROLLER():
         except Exception as e:
             logger.error(f"Error creando DataFrame vacío desde DynamoDB para tabla {table_name}: {str(e)}")
             # En caso de error, devolver un DataFrame completamente vacío
-            return self.spark.createDataFrame([], StructType([]))
+            raise ValueError(f"Error creando DataFrame vacío desde DynamoDB para tabla {table_name}: {str(e)}")
             
     def get_now_lima_datetime(self):
         return NOW_LIMA
-
-    def read_spark_table(self, path, table_name, update_records, update_columns):
-        try:
-            update_expr =  ""
-            for column in update_columns:
-                update_expr += f"a.{column} = b.{column} and "
-            update_expr = update_expr[:-4]
-            s3_path = f"{path}{table_name}/"
-            if DeltaTable.isDeltaTable(self.spark, s3_path):
-                dt = DeltaTable.forPath(self.spark, s3_path)
-                dt.alias("a")\
-                    .merge(source = update_records.alias("b"), condition = update_expr) \
-                    .whenMatchedUpdateAll()\
-                    .execute()
-        except Exception as e:
-            logger.error(e)
 
     def read_table(self, path, table_name, cod_pais = [], have_principal = False, schema = False):
         try:
@@ -213,10 +204,10 @@ class SPARK_CONTROLLER():
 
             elif path == data_paths.APDAYC:
                 table = dynamodb_resource.Table(DYNAMODB_DATABASE_NAME)
-                # Escaneo con filtro
                 response = table.scan(
                     FilterExpression=Attr('DATA_SOURCE').eq('apdayc') & 
-                                    Attr('TEAM').eq(TEAM)
+                                    Attr('TEAM').eq(TEAM) & 
+                                    Attr('INSTANCE').is_in(INSTANCES)
                 )
 
                 items = []
@@ -224,8 +215,7 @@ class SPARK_CONTROLLER():
                     if have_principal:
                         if not item.get('IS_PRINCIPAL', False):
                             continue
-                    if item['INSTANCE'] == INSTANCIAS.split(",")[0]:
-                        items.append(item['ENDPOINT_NAME'])
+                    items.append(item['ENDPOINT_NAME'])
                 
                 df_list = []
                 table_exists_somewhere = False
@@ -256,10 +246,36 @@ class SPARK_CONTROLLER():
 
             return df
         except Exception as e:
-            logger.error(e)
             logger.error(f"Source table cannot be read {table_name}")
             # self.logger.send_error_message(ERROR_TOPIC_ARN,f"Reading table {table_name}", str(e))
             raise e
+
+    def upsert(self, df, path, table_name, id_columns, partition_by : list = []):
+        logger.info(f"Upserting table {table_name}")
+        if self.table_exists(path, table_name):
+            logger.info(f"table exists")
+            self.update_table(df, path, table_name, id_columns)
+        else:
+            logger.info(f"table not exists")
+            self.write_table(df, path, table_name, partition_by)
+    
+    def update_table(self, update_records, path, table_name, update_columns_ids):
+        table_path = f"{path}{table_name}/"
+
+        expression = ""
+        for column in update_columns_ids:
+            expression += f"a.{column} = b.{column} and "
+        expression = expression[:-4]
+
+        deltaTable = DeltaTable.forPath(self.spark, table_path)
+        deltaTable.alias("a")\
+            .merge(source=update_records.alias("b"), condition=expression) \
+            .whenMatchedUpdateAll()\
+            .whenNotMatchedInsertAll()\
+            .execute()
+
+        deltaTable.vacuum(100)
+        deltaTable.generate("symlink_format_manifest")
 
     def write_table(self, df, path, table_name, partition_by : list = []):
         try:
@@ -275,6 +291,24 @@ class SPARK_CONTROLLER():
             logger.error(str(e))
             self.logger.send_error_message(ERROR_TOPIC_ARN,f"Writing table {table_name}", str(e))
             raise e
+
+    ###########################################################################################################
+
+    def read_spark_table(self, path, table_name, update_records, update_columns):
+        try:
+            update_expr =  ""
+            for column in update_columns:
+                update_expr += f"a.{column} = b.{column} and "
+            update_expr = update_expr[:-4]
+            s3_path = f"{path}{table_name}/"
+            if DeltaTable.isDeltaTable(self.spark, s3_path):
+                dt = DeltaTable.forPath(self.spark, s3_path)
+                dt.alias("a")\
+                    .merge(source = update_records.alias("b"), condition = update_expr) \
+                    .whenMatchedUpdateAll()\
+                    .execute()
+        except Exception as e:
+            logger.error(e)
     
     def insert_into_table(self, df, path, table_name, partition_by : list = []):
         try:
@@ -294,33 +328,6 @@ class SPARK_CONTROLLER():
         except Exception as e:
             logger.error(e)
             return False
-        
-    def update_table(self, update_records, path, table_name, update_columns_ids):
-        table_path = f"{path}{table_name}/"
-
-        expression = ""
-        for column in update_columns_ids:
-            expression += f"a.{column} = b.{column} and "
-        expression = expression[:-4]
-
-        deltaTable = DeltaTable.forPath(self.spark, table_path)
-        deltaTable.alias("a")\
-            .merge(source=update_records.alias("b"), condition=expression) \
-            .whenMatchedUpdateAll()\
-            .whenNotMatchedInsertAll()\
-            .execute()
-
-        deltaTable.vacuum(100)
-        deltaTable.generate("symlink_format_manifest")
-
-    def upsert(self, df, path, table_name, id_columns, partition_by : list = []):
-        logger.info(f"Upserting table {table_name}")
-        if self.table_exists(path, table_name):
-            logger.info(f"table exists")
-            self.update_table(df, path, table_name, id_columns)
-        else:
-            logger.info(f"table not exists")
-            self.write_table(df, path, table_name, partition_by)
 
     def get_previous_period(self, date : str = NOW_LIMA.strftime("%Y%m")):
         year = int(date[:4])
