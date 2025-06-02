@@ -1,28 +1,27 @@
-from common_jobs_functions import data_paths, logger, COD_PAIS, SPARK_CONTROLLER
+from common_jobs_functions import data_paths, logger, SPARK_CONTROLLER
 from pyspark.sql.functions import col
 
 spark_controller = SPARK_CONTROLLER()
+target_table_name = "m_medio_transporte"
 
 try:
-    cod_pais = COD_PAIS.split(",")
-    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
-    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais, have_principal = True)
-    m_vehiculo = spark_controller.read_table(data_paths.APDAYC, "m_vehiculo", cod_pais=cod_pais)
-    m_tipo_vehiculo = spark_controller.read_table(data_paths.APDAYC, "m_tipo_vehiculo", cod_pais=cod_pais)
-    m_capacidad_vehiculo = spark_controller.read_table(data_paths.APDAYC, "m_capacidad_vehiculo", cod_pais=cod_pais)
-
-    target_table_name = "m_medio_transporte"
+    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania")
+    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", have_principal = True)
+    m_vehiculo = spark_controller.read_table(data_paths.APDAYC, "m_vehiculo")
+    m_tipo_vehiculo = spark_controller.read_table(data_paths.APDAYC, "m_tipo_vehiculo")
+    m_capacidad_vehiculo = spark_controller.read_table(data_paths.APDAYC, "m_capacidad_vehiculo")
 
 except Exception as e:
-    logger.error(e)
-    raise
+    logger.error(f"Error reading tables: {e}")
+    raise ValueError(f"Error reading tables: {e}")
 
 try:
-    m_pais = m_pais.filter(col("id_pais").isin(cod_pais))
+    logger.info("Starting creation of df_m_medio_transporte")
+
     m_vehiculo = m_vehiculo.orderBy(col("fecha_modificacion").desc())
     m_vehiculo = m_vehiculo.dropDuplicates(["id_medio_transporte"])
 
-    tmp_dominio_m_medio_transporte = (
+    df_dom_m_medio_transporte = (
         m_vehiculo.alias("mv")
         .join(m_compania.alias("mc"), col("mc.cod_compania") == col("mv.cod_compania"), "inner")
         .join(m_pais.alias("mp"), col("mp.cod_pais") == col("mc.cod_pais"), "inner")
@@ -46,7 +45,7 @@ try:
         .distinct()
     )
 
-    tmp = tmp_dominio_m_medio_transporte.select(
+    tmp = df_dom_m_medio_transporte.select(
         col("id_medio_transporte").cast("string").alias("id_medio_transporte"),
         col("id_pais").cast("string").alias("id_pais"),
         col("cod_medio_transporte").cast("string").alias("cod_medio_transporte"),
@@ -64,9 +63,9 @@ try:
 
     id_columns = ["id_medio_transporte"]
     partition_columns_array = ["id_pais"]
-
-    spark_controller.upsert(tmp_dominio_m_medio_transporte, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
-
+    logger.info(f"starting upsert of {target_table_name}")
+    spark_controller.upsert(df_dom_m_medio_transporte, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
+    logger.info(f"Upsert of {target_table_name} finished")
 except Exception as e:
-    logger.error(e)
-    raise
+    logger.error(f"Error processing df_dom_m_medio_transporte: {e}")
+    raise ValueError(f"Error processing df_dom_m_medio_transporte: {e}")

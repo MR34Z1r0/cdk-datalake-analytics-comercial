@@ -1,4 +1,4 @@
-from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths, COD_PAIS
+from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths
 from pyspark.sql.functions import col, concat, concat_ws, lit, coalesce, when, date_format, round, trim, to_date, substring, lower, to_timestamp, row_number, max, sum, upper 
 from pyspark.sql.window import Window
 
@@ -6,23 +6,21 @@ spark_controller = SPARK_CONTROLLER()
 target_table_name = "t_venta_detalle"
 try:
     PERIODOS= spark_controller.get_periods()
-    cod_pais = COD_PAIS.split(",")
-    logger.info(f"Databases: {cod_pais}")
 
-    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais, have_principal = True)
-    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
-    df_m_parametro = spark_controller.read_table(data_paths.APDAYC, "m_parametro", cod_pais=cod_pais)
-    df_m_tipo_cambio = spark_controller.read_table(data_paths.APDAYC, "m_tipo_cambio", cod_pais=cod_pais)
-    df_m_articulo = spark_controller.read_table(data_paths.APDAYC, "m_articulo", cod_pais=cod_pais)
-    df_m_linea = spark_controller.read_table(data_paths.APDAYC, "m_linea", cod_pais=cod_pais)
-    df_m_operacion = spark_controller.read_table(data_paths.APDAYC, "m_operacion", cod_pais=cod_pais)
-    df_t_historico_venta_detalle = spark_controller.read_table(data_paths.APDAYC, "t_documento_venta_detalle", cod_pais=cod_pais)
-    df_t_historico_venta = spark_controller.read_table(data_paths.APDAYC, "t_documento_venta", cod_pais=cod_pais)
+    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", have_principal = True)
+    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania")
+    df_m_parametro = spark_controller.read_table(data_paths.APDAYC, "m_parametro")
+    df_m_tipo_cambio = spark_controller.read_table(data_paths.APDAYC, "m_tipo_cambio")
+    df_m_articulo = spark_controller.read_table(data_paths.APDAYC, "m_articulo")
+    df_m_linea = spark_controller.read_table(data_paths.APDAYC, "m_linea")
+    df_m_operacion = spark_controller.read_table(data_paths.APDAYC, "m_operacion")
+    df_t_historico_venta_detalle = spark_controller.read_table(data_paths.APDAYC, "t_documento_venta_detalle")
+    df_t_historico_venta = spark_controller.read_table(data_paths.APDAYC, "t_documento_venta")
 
     logger.info("Dataframes load successfully")
 except Exception as e:
-    logger.error(e)
-    raise
+    logger.error(f"Error reading tables: {e}")
+    raise ValueError(f"Error reading tables: {e}")  
 try:
     logger.info("starting filter of pais and periodo") 
     df_t_historico_venta = df_t_historico_venta.filter(date_format(col("fecha_liquidacion"), "yyyyMM").isin(PERIODOS))
@@ -175,8 +173,8 @@ try:
         )
     )
  
-    logger.info("starting creation of df_t_venta_detalle")
-    df_t_venta_detalle = (
+    logger.info("starting creation of df_dom_t_venta_detalle")
+    df_dom_t_venta_detalle = (
         df_t_historico_venta_detalle_select 
         .groupby(
             col("id_venta"),
@@ -335,10 +333,10 @@ try:
             col("es_eliminado").cast("int")
         )
     ) 
-
-    logger.info(f"starting write of {target_table_name}")
     partition_columns_array = ["id_pais", "id_periodo"]
-    spark_controller.write_table(df_t_venta_detalle, data_paths.DOMAIN, target_table_name, partition_columns_array)
+    logger.info(f"starting write of {target_table_name}")
+    spark_controller.write_table(df_dom_t_venta_detalle, data_paths.DOMAIN, target_table_name, partition_columns_array)
+    logger.info(f"Write de {target_table_name} completado exitosamente")
 except Exception as e:
-    logger.error(e)
-    raise 
+    logger.error(f"Error processing df_dom_t_venta_detalle: {e}")
+    raise ValueError(f"Error processing df_dom_t_venta_detalle: {e}")

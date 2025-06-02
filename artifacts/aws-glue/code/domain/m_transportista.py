@@ -1,24 +1,21 @@
-from common_jobs_functions import data_paths, logger, COD_PAIS, SPARK_CONTROLLER
+from common_jobs_functions import data_paths, logger, SPARK_CONTROLLER
 from pyspark.sql.functions import col
 
 spark_controller = SPARK_CONTROLLER()
+target_table_name = "m_transportista"
 
 try:
-    cod_pais = COD_PAIS.split(",")
-    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
-    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais, have_principal = True)
-    m_transportista = spark_controller.read_table(data_paths.APDAYC, "m_transportista", cod_pais=cod_pais)
-    m_persona = spark_controller.read_table(data_paths.APDAYC, "m_persona", cod_pais=cod_pais)
-    m_tipo_transportista = spark_controller.read_table(data_paths.APDAYC, "m_tipo_transportista", cod_pais=cod_pais)
-
-    target_table_name = "m_transportista"
+    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania")
+    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", have_principal = True)
+    m_transportista = spark_controller.read_table(data_paths.APDAYC, "m_transportista")
+    m_persona = spark_controller.read_table(data_paths.APDAYC, "m_persona")
+    m_tipo_transportista = spark_controller.read_table(data_paths.APDAYC, "m_tipo_transportista")
 
 except Exception as e:
-    logger.error(e)
-    raise
+    logger.error(f"Error reading tables: {e}")
+    raise ValueError(f"Error reading tables: {e}")
 
 try:
-    m_pais = m_pais.filter(col("id_pais").isin(cod_pais))
 
     tmp_dominio_m_transportista = (
         m_transportista.alias("mt")
@@ -44,7 +41,7 @@ try:
         )
     )
 
-    tmp = tmp_dominio_m_transportista.select(
+    df_dom_m_transportista = tmp_dominio_m_transportista.select(
         col("id_transportista").cast("string").alias("id_transportista"),
         col("id_pais").cast("string").alias("id_pais"),
         col("cod_transportista").cast("integer").alias("cod_transportista"),
@@ -58,9 +55,9 @@ try:
 
     id_columns = ["id_transportista"]
     partition_columns_array = ["id_pais"]
-
-    spark_controller.upsert(tmp, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
-
+    logger.info(f"starting upsert of {target_table_name}")
+    spark_controller.upsert(df_dom_m_transportista, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
+    logger.info(f"Upsert of {target_table_name} finished")
 except Exception as e:
-    logger.error(e)
-    raise
+    logger.error(f"Error processing df_dom_m_transportista: {e}")
+    raise ValueError(f"Error processing df_dom_m_transportista: {e}")
