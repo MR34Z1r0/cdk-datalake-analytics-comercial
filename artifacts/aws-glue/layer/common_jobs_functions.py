@@ -118,92 +118,96 @@ class SPARK_CONTROLLER():
 
         self.logger = LOGGING_UTILS()
     
-    def _create_empty_dataframe_from_dynamodb(self, table_name, cod_pais = []):
+    def _create_empty_dataframe_from_dynamodb(self, path, table_name):
         """
         Crea un DataFrame vacío basado en el schema definido en DynamoDB
         para la tabla sofia-dev-datalake-columns-specifications-ddb
         """
         try:
-            if len(INSTANCES) == 0:
-                logger.error(f"No hay instancias definidas para la tabla {table_name}")
-                # Crear un DataFrame vacío básico si no hay especificaciones
-                raise ValueError(f"No hay instancias definidas para la tabla {table_name}")
+            if path == data_paths.APDAYC:
+                if len(INSTANCES) == 0:
+                    logger.error(f"No hay instancias definidas para la tabla {table_name}")
+                    # Crear un DataFrame vacío básico si no hay especificaciones
+                    raise ValueError(f"No hay instancias definidas para la tabla {table_name}")
 
-            # Conectar a la tabla de especificaciones de columnas
-            database_table = dynamodb_resource.Table(DYNAMODB_DATABASE_NAME)
-            columns_table = dynamodb_resource.Table(DYNAMODB_COLUMNS_NAME)
-            
-            # Buscar las especificaciones de la Base de Datos
-            logger.info(f"Buscando especificaciones de base de datos para la tabla {table_name} y el equipo {TEAM}")
-            response = database_table.scan(
-                FilterExpression=Attr('TEAM').eq(TEAM) & 
-                            Attr('IS_PRINCIPAL').eq(True) & 
-                            Attr('DATA_SOURCE').is_in(DATA_SOURCES) &
-                            Attr('INSTANCE').eq(INSTANCES[0])
-            )
-
-            items = response.get('Items', [])
-            if len(items) == 0:
-                logger.error(f"No se encontraron especificaciones de base de datos para la instancia {INSTANCES[0]} y el equipo {TEAM}")
-                # Crear un DataFrame vacío básico si no hay especificaciones
-                raise ValueError(f"No se encontraron especificaciones de base de datos para la instancia {INSTANCES[0]} y el equipo {TEAM}")
-            
-            ENDPOINT_NAME = items[0]['ENDPOINT_NAME']
-            logger.info(f"Endpoint name: {ENDPOINT_NAME}")
-            # Buscar las especificaciones de la tabla
-            logger.info(f"Buscando especificaciones de columnas para la tabla {table_name} en el endpoint {ENDPOINT_NAME}")
-            response = columns_table.scan(
-                FilterExpression=Attr('TABLE_NAME').eq(table_name.upper()) & 
-                            Attr('TEAM').eq(TEAM) & 
-                            Attr('DATA_SOURCE').is_in(DATA_SOURCES) &
-                            Attr('ENDPOINT').eq(ENDPOINT_NAME)
-            )
-
-            items = []
-            for item in response.get('Items', []):
-                items.append(item)
-            logger.info(f"Se encontraron {len(items)} especificaciones de columnas para la tabla {table_name} en el endpoint {ENDPOINT_NAME}")
-            if len(items) == 0:
-                logger.error(f"No se encontraron especificaciones de columnas para la tabla {table_name}")
-                # Crear un DataFrame vacío básico si no hay especificaciones
-                raise ValueError(f"No se encontraron especificaciones de columnas para la tabla {table_name}")
-            
-            # Ordenar por COLUMN_ID para mantener el orden correcto
-            columns_specs = sorted(items, key=lambda x: x.get('COLUMN_ID', 0))
-            
-            # Mapeo de tipos de datos
-            type_mapping = {
-                'string': StringType(),
-                'int': IntegerType(),
-                'integer': IntegerType(),
-                'double': DoubleType(),
-                'float': DoubleType(),
-                'boolean': BooleanType(),
-                'date': DateType(),
-                'timestamp': TimestampType()
-            }
-            
-            # Crear el schema
-            fields = []
-            for col_spec in columns_specs:
-                column_name = col_spec['COLUMN_NAME']
-                data_type = col_spec.get('NEW_DATA_TYPE', 'string').lower()
+                # Conectar a la tabla de especificaciones de columnas
+                database_table = dynamodb_resource.Table(DYNAMODB_DATABASE_NAME)
+                columns_table = dynamodb_resource.Table(DYNAMODB_COLUMNS_NAME)
                 
-                # Obtener el tipo de dato de Spark correspondiente
-                spark_type = type_mapping.get(data_type, StringType())
-                
-                fields.append(StructField(column_name, spark_type, True))
-            
-            logger.info(f"Se han encontrado {len(fields)} columnas para la tabla {table_name} con los siguientes tipos: {[f.name + ':' + f.dataType.simpleString() for f in fields]}")
+                # Buscar las especificaciones de la Base de Datos
+                logger.info(f"Buscando especificaciones de base de datos para la tabla {table_name} y el equipo {TEAM} en la instancia {INSTANCES[0]}")
+                response = database_table.scan(
+                    FilterExpression=Attr('TEAM').eq(TEAM) & 
+                                Attr('IS_PRINCIPAL').eq(True) & 
+                                Attr('DATA_SOURCE').eq('apdayc') &
+                                Attr('INSTANCE').eq(INSTANCES[0])
+                )
 
-            schema = StructType(fields)
-            
-            # Crear DataFrame vacío con el schema
-            empty_df = self.spark.createDataFrame([], schema)
-            
-            logger.info(f"DataFrame vacío creado para tabla {table_name} con {len(fields)} columnas")
-            return empty_df
-            
+                items = response.get('Items', [])
+                if len(items) == 0:
+                    logger.error(f"No se encontraron especificaciones de base de datos para la instancia {INSTANCES[0]} y el equipo {TEAM}")
+                    # Crear un DataFrame vacío básico si no hay especificaciones
+                    raise ValueError(f"No se encontraron especificaciones de base de datos para la instancia {INSTANCES[0]} y el equipo {TEAM}")
+                
+                ENDPOINT_NAME = items[0]['ENDPOINT_NAME']
+                logger.info(f"Endpoint name: {ENDPOINT_NAME}")
+                # Buscar las especificaciones de la tabla
+                logger.info(f"Buscando especificaciones de columnas para la tabla {table_name.upper()} en el endpoint {ENDPOINT_NAME} y el equipo {TEAM}")
+                response = columns_table.scan(
+                    FilterExpression=Attr('TABLE_NAME').eq(table_name.upper()) & 
+                                Attr('TEAM').eq(TEAM) & 
+                                Attr('DATA_SOURCE').eq('apdayc') &
+                                Attr('ENDPOINT_NAME').eq(ENDPOINT_NAME)
+                )
+
+                items = []
+                for item in response.get('Items', []):
+                    items.append(item)
+                logger.info(f"Se encontraron {len(items)} especificaciones de columnas para la tabla {table_name} en el endpoint {ENDPOINT_NAME}")
+                if len(items) == 0:
+                    logger.error(f"No se encontraron especificaciones de columnas para la tabla {table_name}")
+                    # Crear un DataFrame vacío básico si no hay especificaciones
+                    raise ValueError(f"No se encontraron especificaciones de columnas para la tabla {table_name}")
+                
+                # Ordenar por COLUMN_ID para mantener el orden correcto
+                columns_specs = sorted(items, key=lambda x: x.get('COLUMN_ID', 0))
+                
+                # Mapeo de tipos de datos
+                type_mapping = {
+                    'string': StringType(),
+                    'int': IntegerType(),
+                    'integer': IntegerType(),
+                    'double': DoubleType(),
+                    'float': DoubleType(),
+                    'boolean': BooleanType(),
+                    'date': DateType(),
+                    'timestamp': TimestampType()
+                }
+                
+                # Crear el schema
+                fields = []
+                for col_spec in columns_specs:
+                    column_name = col_spec['COLUMN_NAME']
+                    data_type = col_spec.get('NEW_DATA_TYPE', 'string').lower()
+                    
+                    # Obtener el tipo de dato de Spark correspondiente
+                    spark_type = type_mapping.get(data_type, StringType())
+                    
+                    fields.append(StructField(column_name, spark_type, True))
+                
+                logger.info(f"Se han encontrado {len(fields)} columnas para la tabla {table_name} con los siguientes tipos: {[f.name + ':' + f.dataType.simpleString() for f in fields]}")
+
+                schema = StructType(fields)
+                
+                # Crear DataFrame vacío con el schema
+                empty_df = self.spark.createDataFrame([], schema)
+                
+                logger.info(f"DataFrame vacío creado para tabla {table_name} con {len(fields)} columnas")
+                return empty_df
+            else:
+                logger.error(f"Path {path} no es válido para crear DataFrame vacío desde DynamoDB")
+                # Crear un DataFrame vacío básico si el path no es válido
+                raise ValueError(f"Path {path} no es válido para crear DataFrame vacío desde DynamoDB")
         except Exception as e:
             logger.error(f"Error creando DataFrame vacío desde DynamoDB para tabla {table_name}: {str(e)}")
             # En caso de error, devolver un DataFrame completamente vacío
@@ -212,7 +216,7 @@ class SPARK_CONTROLLER():
     def get_now_lima_datetime(self):
         return NOW_LIMA
 
-    def read_table(self, path, table_name, cod_pais = [], have_principal = False, schema = False):
+    def read_table(self, path, table_name, have_principal = False, schema = False):
         try:
             s3_path = f"{path}{table_name}/"
             if path == data_paths.EXTERNAL or path == data_paths.ARTIFACTS_CSV:
@@ -255,7 +259,7 @@ class SPARK_CONTROLLER():
                 # Si no se encontró ninguna tabla, crear DataFrame vacío con schema de DynamoDB
                 if not table_exists_somewhere:
                     logger.warning(f"Tabla {table_name} no existe en ninguna ubicación. Creando DataFrame vacío con schema de DynamoDB.")
-                    df = self._create_empty_dataframe_from_dynamodb(table_name)
+                    df = self._create_empty_dataframe_from_dynamodb(path, table_name)
                 else:
                     # Unir todos los DataFrames en uno solo si hay más de una carpeta
                     df = df_list[0] if len(df_list) == 1 else df_list[0].unionByName(*df_list[1:])

@@ -1,8 +1,6 @@
 from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths
 from pyspark.sql.functions import col, concat, concat_ws, lit, coalesce, when, date_format, round, trim, to_date, substring, lower, to_timestamp, row_number, max, sum
 from pyspark.sql.window import Window
-
-
 spark_controller = SPARK_CONTROLLER()
 target_table_name = "t_pedido_detalle_cumplimiento"
 try:
