@@ -1,48 +1,55 @@
-from common_jobs_functions import data_paths, logger, COD_PAIS, SPARK_CONTROLLER
+from common_jobs_functions import data_paths, logger, SPARK_CONTROLLER
 from pyspark.sql.functions import col, concat_ws, date_format, lit, when
 
 spark_controller = SPARK_CONTROLLER()
 target_table_name = "t_movimiento_inventario_detalle"
-
 try:
-    cod_pais = COD_PAIS.split(",")
-    periodos= spark_controller.get_periods()
-    logger.info(periodos)
+    PERIODOS= spark_controller.get_periods()
+    logger.info(f"Periods to filter: {PERIODOS}")
 
-    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
-    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais, have_principal=True)
-    m_parametro = spark_controller.read_table(data_paths.APDAYC, "m_parametro", cod_pais=cod_pais)
-    m_documento_almacen = spark_controller.read_table(data_paths.APDAYC, "m_documento_almacen", cod_pais=cod_pais)
-    m_articulo = spark_controller.read_table(data_paths.APDAYC, "m_articulo", cod_pais=cod_pais)
-    m_tipo_cambio = spark_controller.read_table(data_paths.APDAYC, "m_tipo_cambio", cod_pais=cod_pais)
-    t_cierre_inventario_cpm = spark_controller.read_table(data_paths.APDAYC, "t_cierre_inventario_cpm", cod_pais=cod_pais)
-    t_movimiento_inventario_detalle = spark_controller.read_table(data_paths.APDAYC, "t_movimiento_inventario_detalle", cod_pais=cod_pais)
-    t_movimiento_inventario_dom = spark_controller.read_table(data_paths.DOMAIN, "t_movimiento_inventario", cod_pais=cod_pais)
+    df_m_compania = spark_controller.read_table(data_paths.BIGMAGIC, "m_compania")
+    df_m_pais = spark_controller.read_table(data_paths.BIGMAGIC, "m_pais", have_principal=True)
+    df_m_parametro = spark_controller.read_table(data_paths.BIGMAGIC, "m_parametro")
+    df_m_documento_almacen = spark_controller.read_table(data_paths.BIGMAGIC, "m_documento_almacen")
+    df_m_articulo = spark_controller.read_table(data_paths.BIGMAGIC, "m_articulo")
+    df_m_tipo_cambio = spark_controller.read_table(data_paths.BIGMAGIC, "m_tipo_cambio")
 
+    df_t_cierre_inventario_cpm = spark_controller.read_table(data_paths.BIGMAGIC, "t_cierre_inventario_cpm")
+    df_t_movimiento_inventario_detalle = spark_controller.read_table(data_paths.BIGMAGIC, "t_movimiento_inventario_detalle")
+    df_t_movimiento_inventario_dom = spark_controller.read_table(data_paths.DOMAIN, "t_movimiento_inventario")
+    
+    logger.info("Dataframes load successfully")
 except Exception as e:
-    logger.error(e)
-    raise
+    logger.error(f"Error reading tables: {e}")
+    raise ValueError(f"Error reading tables: {e}")
 try:
-    m_pais = m_pais.filter(col("id_pais").isin(cod_pais))
-    m_tipo_cambio = m_tipo_cambio.filter((col("fecha").isNotNull()) & (col("tc_compra") > 0) & (col("tc_venta") > 0))
+    df_t_movimiento_inventario_detalle = df_t_movimiento_inventario_detalle.filter(date_format(col("fecha_almacen"), "yyyyMM").isin(PERIODOS))
 
-    t_movimiento_inventario_detalle = t_movimiento_inventario_detalle.filter(date_format(col("fecha_almacen"), "yyyyMM").isin(periodos))
+    logger.info("starting creation of df_m_compania")
+    df_m_compania = (
+        df_m_compania.alias("mc")
+        .join(
+            df_m_parametro.alias("mpar"),
+            col("mpar.id_compania") == col("mc.id_compania"),
+            "left",
+        )
+        .join(
+            df_m_pais.alias("mp"),
+            col("mp.cod_pais") == col("mc.cod_pais"),
+        )
+        .select(col("mp.id_pais"), col("mc.cod_compania").alias("id_compania"), col("mc.cod_compania"), col("mc.cod_pais"), col("mpar.cod_moneda_mn").alias("moneda_mn"))
+    ).cache()
 
-    m_compania = (
-        m_compania.alias("mc")
-        .join(m_parametro.alias("mp"), col("mp.id_compania") == col("mc.id_compania"), "left")
-        .select(
-            col("mc.*"), 
-            col("mp.cod_moneda_mn").alias("moneda_mn"))
-    )
-
-    tmp_t_historico_almacen_detalle = (
-        t_movimiento_inventario_detalle.alias("tmid")
-        .join(t_movimiento_inventario_dom.alias("tmi"), col("tmi.id_movimiento_almacen") == concat_ws("|", col("tmid.cod_compania"), col("tmid.cod_sucursal"), col("tmid.cod_almacen_emisor_origen"), col("tmid.nro_documento_movimiento")), "inner")
-        .join(m_documento_almacen.alias("mda"), (col("tmid.cod_compania") == col("mda.cod_compania")) & (col("tmid.cod_procedimiento") == col("mda.cod_transaccion")), "inner")
-        .join(m_compania.alias("mc"), col("tmid.cod_compania") == col("mc.cod_compania"), "inner")
-        .join(m_pais.alias("mp"), col("mp.cod_pais") == col("mc.cod_pais"), "inner")
-        .join(m_articulo.alias("ma"), (col("tmid.cod_compania") == col("ma.cod_compania")) & (col("tmid.cod_articulo") == col("ma.cod_articulo")), "inner")
+    df_tmp_movimiento_inventario_detalle = (
+        df_t_movimiento_inventario_detalle.alias("tmid")
+        .join(df_m_documento_almacen.alias("mda"), 
+              (col("tmid.cod_compania") == col("mda.cod_compania")) & 
+              (col("tmid.cod_procedimiento") == col("mda.cod_transaccion")), "inner")
+        .join(df_m_compania.alias("mc"), col("tmid.cod_compania") == col("mc.cod_compania"), "inner")
+        .join(df_m_pais.alias("mp"), col("mp.cod_pais") == col("mc.cod_pais"), "inner")
+        .join(df_m_articulo.alias("ma"), 
+              (col("tmid.cod_compania") == col("ma.cod_compania")) & 
+              (col("tmid.cod_articulo") == col("ma.cod_articulo")), "inner")
         .select(
             col("mp.id_pais"),
             date_format(col("tmid.fecha_almacen"), "yyyyMM").alias("id_periodo"),
@@ -68,41 +75,36 @@ try:
             ((when(col("mda.cod_operacion_origen") == "S", 1).otherwise(-1)) * col("tmid.cant_cajas")).alias("cant_cajafisica"),
             ((when(col("mda.cod_operacion_origen") == "S", 1).otherwise(-1)) * col("tmid.cant_botellas")).alias("cant_unidades"),
             ((when(col("mda.cod_operacion_origen") == "S", 1).otherwise(-1)) * col("tmid.cant_unidades")).alias("cant_unidades_total"),
-
             when(col("mda.cod_operacion_origen") == 'S', col("tmid.cant_cajas")).otherwise(0).alias("cant_cajafisica_ingresada"),
             when(col("mda.cod_operacion_origen") == 'R', col("tmid.cant_cajas")).otherwise(0).alias("cant_cajafisica_salida"),
-
             when(col("mda.cod_operacion_origen") == 'S', col("tmid.cant_botellas")).otherwise(0).alias("cant_unidades_ingresada"),
             when(col("mda.cod_operacion_origen") == 'R', col("tmid.cant_botellas")).otherwise(0).alias("cant_unidades_salida"),
-
             when(col("mda.cod_operacion_origen") == 'S', col("tmid.cant_unidades")).otherwise(0).alias("cant_unidades_total_ingresada"),
             when(col("mda.cod_operacion_origen") == 'R', col("tmid.cant_unidades")).otherwise(0).alias("cant_unidades_total_salida"),
-
             when(col("mda.cod_operacion_origen") == 'S', col("tmid.costo_total")).otherwise(0).alias("imp_total_ingreso"),
             when(col("mda.cod_operacion_origen") == 'R', col("tmid.costo_total")).otherwise(0).alias("imp_total_salida"),
-
             when((col("tmid.estado") == 'PLI') & (col("tmid.cod_documento_transaccion") == 'GRA'), col("tmid.cant_unidades")).otherwise(0).alias("cant_unidades_transito"),
             when((col("tmid.estado") == 'PLI') & (col("tmid.cod_documento_transaccion") == 'GRA'), col("tmid.costo_total")).otherwise(0).alias("imp_total_transito"),
             when(col("tmid.cod_procedimiento") == 'REV', col("tmid.operacion_kardex")).otherwise(col("mda.cod_operacion_origen")).alias("cod_operacion_kardex"),
             col("ma.cant_unidad_paquete").alias("cant_unidad_paquete"),
+            col("tmid.nro_secuencia_origen"),
             col("tmid.usuario_creacion"),
             col("tmid.fecha_creacion"),
             col("tmid.usuario_modificacion"),
             col("tmid.fecha_modificacion"),
-            col("tmid.nro_secuencia_origen"),
         )
     )
 
-    tmp_t_movimiento_inventario_detalle_valorizado = (
-        tmp_t_historico_almacen_detalle.alias("thad")
-        .join(m_compania.alias("mc"), col("thad.id_compania") == col("mc.cod_compania"), "inner")
-        .join(t_cierre_inventario_cpm.alias("c"), 
+    df_dom_t_movimiento_inventario_detalle = (
+        df_tmp_movimiento_inventario_detalle.alias("thad")
+        .join(df_m_compania.alias("mc"), col("thad.id_compania") == col("mc.cod_compania"), "inner")
+        .join(df_t_cierre_inventario_cpm.alias("c"), 
             (col("c.id_sucursal") == col("thad.id_sucursal")) 
             & (col("c.id_articulo") == col("thad.id_articulo")) 
             & (col("c.id_periodo") == col("thad.id_periodo"))
             , "left"
         )
-        .join(m_tipo_cambio.alias("mtc"), 
+        .join(df_m_tipo_cambio.alias("mtc"), 
               (col("thad.id_compania") == col("mtc.cod_compania")) 
               & (col("thad.fecha_almacen") == col("mtc.fecha")) 
               & (col("mc.moneda_mn") == col("mtc.cod_moneda"))
@@ -172,7 +174,7 @@ try:
         )
     )
 
-    tmp = tmp_t_movimiento_inventario_detalle_valorizado.select(
+    df_dom_t_movimiento_inventario_detalle = df_dom_t_movimiento_inventario_detalle.select(
         col("id_pais").cast("string").alias("id_pais"),
         col("id_periodo").cast("string").alias("id_periodo"),
         col("id_compania").cast("string").alias("id_compania"),
@@ -226,9 +228,10 @@ try:
         col("es_eliminado").cast("int").alias("es_eliminado"),
     )
 
+    logger.info(f"starting write of {target_table_name}")
     partition_columns_array = ["id_pais", "id_periodo"]
-    spark_controller.write_table(tmp, data_paths.DOMAIN, target_table_name, partition_columns_array)
-
+    spark_controller.write_table(df_dom_t_movimiento_inventario_detalle, data_paths.DOMAIN, target_table_name, partition_columns_array)
+    logger.info(f"Write de {target_table_name} success completed")
 except Exception as e:
-    logger.error(e)
-    raise
+    logger.error(f"Error processing df_dom_t_movimiento_inventario_detalle: {e}")
+    raise ValueError(f"Error processing df_dom_t_movimiento_inventario_detalle: {e}")

@@ -7,11 +7,11 @@ from pyspark.sql.window import Window
 spark_controller = SPARK_CONTROLLER()
 target_table_name = "m_eje_territorial"
 try: 
-    df_m_distrito = spark_controller.read_table(data_paths.APDAYC, "m_ng3")
-    df_m_provincia = spark_controller.read_table(data_paths.APDAYC, "m_ng2")
-    df_m_departamento = spark_controller.read_table(data_paths.APDAYC, "m_ng1")
-    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania")
-    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", have_principal = True)
+    df_m_distrito = spark_controller.read_table(data_paths.BIGMAGIC, "m_ng3")
+    df_m_provincia = spark_controller.read_table(data_paths.BIGMAGIC, "m_ng2")
+    df_m_departamento = spark_controller.read_table(data_paths.BIGMAGIC, "m_ng1")
+    df_m_compania = spark_controller.read_table(data_paths.BIGMAGIC, "m_compania")
+    df_m_pais = spark_controller.read_table(data_paths.BIGMAGIC, "m_pais", have_principal = True)
 except Exception as e:
     logger.error(f"Error reading tables: {e}")
     raise ValueError(f"Error reading tables: {e}")  
@@ -181,7 +181,7 @@ try:
     partition_columns_array = ["id_pais"]
     logger.info(f"starting upsert of {target_table_name}")
     spark_controller.upsert(df_dom_m_eje_territorial, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
-    logger.info(f"Upsert de {target_table_name} completado exitosamente")
+    logger.info(f"Upsert de {target_table_name} success completed")
 except Exception as e:
     logger.error(f"Error processing df_dom_m_eje_territorial: {e}")
     raise ValueError(f"Error processing df_dom_m_eje_territorial: {e}") 

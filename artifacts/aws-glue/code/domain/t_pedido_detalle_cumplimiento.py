@@ -5,20 +5,22 @@ spark_controller = SPARK_CONTROLLER()
 target_table_name = "t_pedido_detalle_cumplimiento"
 try:
     PERIODOS= spark_controller.get_periods()
+    logger.info(f"Periods to filter: {PERIODOS}")
 
-    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", have_principal = True)
-    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania")
-    df_i_relacion_proced_venta = spark_controller.read_table(data_paths.APDAYC, "i_relacion_proced_venta")
-    df_m_procedimiento = spark_controller.read_table(data_paths.APDAYC, "m_procedimiento")
-    df_m_articulo = spark_controller.read_table(data_paths.APDAYC, "m_articulo")
+    df_m_pais = spark_controller.read_table(data_paths.BIGMAGIC, "m_pais", have_principal = True)
+    df_m_compania = spark_controller.read_table(data_paths.BIGMAGIC, "m_compania")
+    df_m_parametro = spark_controller.read_table(data_paths.BIGMAGIC, "m_parametro")
+    df_i_relacion_proced_venta = spark_controller.read_table(data_paths.BIGMAGIC, "i_relacion_proced_venta")
+    df_m_procedimiento = spark_controller.read_table(data_paths.BIGMAGIC, "m_procedimiento")
+    df_m_articulo = spark_controller.read_table(data_paths.BIGMAGIC, "m_articulo")
  
-    df_t_historico_pedido = spark_controller.read_table(data_paths.APDAYC, "t_documento_pedido")
-    df_t_historico_pedido_detalle = spark_controller.read_table(data_paths.APDAYC, "t_documento_pedido_detalle")
-    df_t_historico_pedido_ades = spark_controller.read_table(data_paths.APDAYC, "t_documento_pedido_ades")
-    df_t_historico_pedido_ades_detalle = spark_controller.read_table(data_paths.APDAYC, "t_documento_pedido_ades_detalle")
-    df_t_historico_almacen = spark_controller.read_table(data_paths.APDAYC, "t_movimiento_inventario")
-    df_t_historico_venta = spark_controller.read_table(data_paths.APDAYC, "t_documento_venta")
-    df_t_historico_venta_detalle = spark_controller.read_table(data_paths.APDAYC, "t_documento_venta_detalle") 
+    df_t_historico_pedido = spark_controller.read_table(data_paths.BIGMAGIC, "t_documento_pedido")
+    df_t_historico_pedido_detalle = spark_controller.read_table(data_paths.BIGMAGIC, "t_documento_pedido_detalle")
+    df_t_historico_pedido_ades = spark_controller.read_table(data_paths.BIGMAGIC, "t_documento_pedido_ades")
+    df_t_historico_pedido_ades_detalle = spark_controller.read_table(data_paths.BIGMAGIC, "t_documento_pedido_ades_detalle")
+    df_t_historico_almacen = spark_controller.read_table(data_paths.BIGMAGIC, "t_movimiento_inventario")
+    df_t_historico_venta = spark_controller.read_table(data_paths.BIGMAGIC, "t_documento_venta")
+    df_t_historico_venta_detalle = spark_controller.read_table(data_paths.BIGMAGIC, "t_documento_venta_detalle") 
 
     logger.info("Dataframes load successfully")
 except Exception as e:
@@ -34,12 +36,17 @@ try:
     logger.info("starting creation of df_m_compania")
     df_m_compania = (
         df_m_compania.alias("mc")
-            .join(
-                df_m_pais.alias("mp"),
-                col("mp.cod_pais") == col("mc.cod_pais"),
-            )
-            .select(col("mc.cod_compania"), trim(col("mp.id_pais")).alias("id_pais"), trim(col("mc.cod_pais")).alias("cod_pais"))
-    )
+        .join(
+            df_m_parametro.alias("mpar"),
+            col("mpar.id_compania") == col("mc.id_compania"),
+            "left",
+        )
+        .join(
+            df_m_pais.alias("mp"),
+            col("mp.cod_pais") == col("mc.cod_pais"),
+        )
+        .select(col("mp.id_pais"), col("mc.cod_compania").alias("id_compania"), col("mc.cod_compania"), col("mc.cod_pais"), col("mpar.cod_moneda_mn").alias("moneda_mn"))
+    ).cache()
 
     logger.info("starting creation of df_i_relacion_proced_venta")
     df_i_relacion_proced_venta = (
@@ -527,7 +534,7 @@ try:
     logger.info(f"starting write of {target_table_name}")
     partition_columns_array = ["id_pais", "id_periodo"]
     spark_controller.write_table(df_dom_t_pedido_detalle_cumplimiento, data_paths.DOMAIN, target_table_name, partition_columns_array)
-    logger.info(f"Write de {target_table_name} completado exitosamente")
+    logger.info(f"Write de {target_table_name} success completed")
 except Exception as e:
     logger.error(f"Error processing df_dom_t_pedido_detalle_cumplimiento: {e}")
     raise ValueError(f"Error processing df_dom_t_pedido_detalle_cumplimiento: {e}")

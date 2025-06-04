@@ -6,17 +6,16 @@ spark_controller = SPARK_CONTROLLER()
 target_table_name = "t_venta_detalle"
 try:
     PERIODOS= spark_controller.get_periods()
-
-    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", have_principal = True)
-    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania")
-    df_m_parametro = spark_controller.read_table(data_paths.APDAYC, "m_parametro")
-    df_m_tipo_cambio = spark_controller.read_table(data_paths.APDAYC, "m_tipo_cambio")
-    df_m_articulo = spark_controller.read_table(data_paths.APDAYC, "m_articulo")
-    df_m_linea = spark_controller.read_table(data_paths.APDAYC, "m_linea")
-    df_m_operacion = spark_controller.read_table(data_paths.APDAYC, "m_operacion")
-    df_t_historico_venta_detalle = spark_controller.read_table(data_paths.APDAYC, "t_documento_venta_detalle")
-    df_t_historico_venta = spark_controller.read_table(data_paths.APDAYC, "t_documento_venta")
-
+    logger.info(f"Periods to filter: {PERIODOS}")
+    df_m_pais = spark_controller.read_table(data_paths.BIGMAGIC, "m_pais", have_principal = True)
+    df_m_compania = spark_controller.read_table(data_paths.BIGMAGIC, "m_compania")
+    df_m_parametro = spark_controller.read_table(data_paths.BIGMAGIC, "m_parametro")
+    df_m_tipo_cambio = spark_controller.read_table(data_paths.BIGMAGIC, "m_tipo_cambio")
+    df_m_articulo = spark_controller.read_table(data_paths.BIGMAGIC, "m_articulo")
+    df_m_linea = spark_controller.read_table(data_paths.BIGMAGIC, "m_linea")
+    df_m_operacion = spark_controller.read_table(data_paths.BIGMAGIC, "m_operacion")
+    df_t_historico_venta_detalle = spark_controller.read_table(data_paths.BIGMAGIC, "t_documento_venta_detalle")
+    df_t_historico_venta = spark_controller.read_table(data_paths.BIGMAGIC, "t_documento_venta")
     logger.info("Dataframes load successfully")
 except Exception as e:
     logger.error(f"Error reading tables: {e}")
@@ -333,10 +332,11 @@ try:
             col("es_eliminado").cast("int")
         )
     ) 
-    partition_columns_array = ["id_pais", "id_periodo"]
+    
     logger.info(f"starting write of {target_table_name}")
+    partition_columns_array = ["id_pais", "id_periodo"]
     spark_controller.write_table(df_dom_t_venta_detalle, data_paths.DOMAIN, target_table_name, partition_columns_array)
-    logger.info(f"Write de {target_table_name} completado exitosamente")
+    logger.info(f"Write de {target_table_name} success completed")
 except Exception as e:
     logger.error(f"Error processing df_dom_t_venta_detalle: {e}")
     raise ValueError(f"Error processing df_dom_t_venta_detalle: {e}")

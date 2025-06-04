@@ -1,20 +1,20 @@
 import datetime as dt
 from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths
 from pyspark.sql.functions import col, concat, lit, coalesce, when, split , trim , current_date, max, row_number, lower, to_date
-from pyspark.sql.types import StringType, DateType
+from pyspark.sql.types import StringType, DateType, TimestampType
 from pyspark.sql.window import Window
 
 spark_controller = SPARK_CONTROLLER() 
 target_table_name = "m_cliente"   
 try:
-    df_m_cliente = spark_controller.read_table(data_paths.APDAYC, "m_cliente")
-    df_m_estructura_cliente = spark_controller.read_table(data_paths.APDAYC, "m_asignacion_modulo")
-    df_m_tipo_cliente = spark_controller.read_table(data_paths.APDAYC, "m_tipo_cliente")
-    df_m_cuenta_clave = spark_controller.read_table(data_paths.APDAYC, "m_cuenta_clave")
-    df_m_canal = spark_controller.read_table(data_paths.APDAYC, "m_canal")
-    df_m_giro = spark_controller.read_table(data_paths.APDAYC, "m_giro")
-    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania")
-    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", have_principal = True)
+    df_m_cliente = spark_controller.read_table(data_paths.BIGMAGIC, "m_cliente")
+    df_m_estructura_cliente = spark_controller.read_table(data_paths.BIGMAGIC, "m_asignacion_modulo")
+    df_m_tipo_cliente = spark_controller.read_table(data_paths.BIGMAGIC, "m_tipo_cliente")
+    df_m_cuenta_clave = spark_controller.read_table(data_paths.BIGMAGIC, "m_cuenta_clave")
+    df_m_canal = spark_controller.read_table(data_paths.BIGMAGIC, "m_canal")
+    df_m_giro = spark_controller.read_table(data_paths.BIGMAGIC, "m_giro")
+    df_m_compania = spark_controller.read_table(data_paths.BIGMAGIC, "m_compania")
+    df_m_pais = spark_controller.read_table(data_paths.BIGMAGIC, "m_pais", have_principal = True)
 except Exception as e:
     logger.error(f"Error reading tables: {e}")
     raise ValueError(f"Error reading tables: {e}")  
@@ -160,7 +160,7 @@ try:
     partition_columns_array = ["id_pais"]
     logger.info(f"starting upsert of {target_table_name}")
     spark_controller.upsert(df_dom_m_cliente, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
-    logger.info(f"Upsert de {target_table_name} completado exitosamente")
+    logger.info(f"Upsert de {target_table_name} success completed")
 except Exception as e:
     logger.error(f"Error processing df_dom_m_cliente: {e}")
     raise ValueError(f"Error processing df_dom_m_cliente: {e}") 

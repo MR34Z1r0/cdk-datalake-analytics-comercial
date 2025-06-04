@@ -1,17 +1,17 @@
 import datetime as dt
 from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths
-from pyspark.sql.functions import col, lit, current_date, concat, trim, max
+from pyspark.sql.functions import col, lit, current_date, concat, concat_ws, trim, max
 from pyspark.sql.types import StringType, DateType
 
 spark_controller = SPARK_CONTROLLER()
 target_table_name = "m_clasificacion_cliente"
 try:
-    i_relacion_consumo = spark_controller.read_table(data_paths.APDAYC, "i_relacion_consumo")
-    m_canal_visibilidad = spark_controller.read_table(data_paths.APDAYC, "m_canal")
-    m_subgiro_visibilidad = spark_controller.read_table(data_paths.APDAYC, "m_subgiro")
-    m_giro_visibilidad = spark_controller.read_table(data_paths.APDAYC, "m_giro")
-    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania")
-    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", have_principal=True)
+    i_relacion_consumo = spark_controller.read_table(data_paths.BIGMAGIC, "i_relacion_consumo")
+    m_canal_visibilidad = spark_controller.read_table(data_paths.BIGMAGIC, "m_canal")
+    m_subgiro_visibilidad = spark_controller.read_table(data_paths.BIGMAGIC, "m_subgiro")
+    m_giro_visibilidad = spark_controller.read_table(data_paths.BIGMAGIC, "m_giro")
+    m_compania = spark_controller.read_table(data_paths.BIGMAGIC, "m_compania")
+    m_pais = spark_controller.read_table(data_paths.BIGMAGIC, "m_pais", have_principal=True)
 except Exception as e:
     logger.error(f"Error reading tables: {e}")
     raise ValueError(f"Error reading tables: {e}")  
@@ -27,8 +27,17 @@ try:
         )
         .select(
             col("mp.id_pais").alias("id_pais"), 
-            concat(trim(col("irc.cod_compania")), lit("|"), lit("SG"), lit("|"), trim(col("irc.cod_subgiro"))).alias("id_clasificacion_cliente"),
-            concat(trim(col("irc.cod_compania")), lit("|"), lit("GR"), lit("|"), trim(col("irc.cod_giro"))).alias("id_clasificacion_cliente_padre"),
+            concat_ws("|", 
+                      trim(col("irc.cod_compania")), 
+                      lit("SG"),
+                      trim(col("irc.cod_subgiro")),
+                      ).alias("id_clasificacion_cliente"),
+            concat_ws("|", 
+                      trim(col("irc.cod_compania")), 
+                      lit("GR"), 
+                      trim(col("irc.cod_giro")),
+                      trim(col("irc.cod_canal")),
+                      ).alias("id_clasificacion_cliente_padre"),
             col("irc.cod_subgiro").alias("cod_clasificacion_cliente"),
             col("mgv.desc_subgiro").alias("nomb_clasificacion_cliente"),
             lit("Subgiro").alias("cod_tipo_clasificacion_cliente"),
@@ -49,8 +58,17 @@ try:
         )
         .select(
             col("mp.id_pais").alias("id_pais"), 
-            concat(trim(col("irc.cod_compania")), lit("|"), lit("GR"), lit("|"), trim(col("irc.cod_giro"))).alias("id_clasificacion_cliente"),
-            concat(trim(col("irc.cod_compania")), lit("|"), lit("CN"), lit("|"), trim(col("irc.cod_canal"))).alias("id_clasificacion_cliente_padre"),
+            concat_ws("|", 
+                      trim(col("irc.cod_compania")), 
+                      lit("GR"), 
+                      trim(col("irc.cod_giro")),
+                      trim(col("irc.cod_canal")),
+                      ).alias("id_clasificacion_cliente"),
+            concat_ws("|", 
+                      trim(col("irc.cod_compania")), 
+                      lit("CN"), 
+                      trim(col("irc.cod_canal"))
+                      ).alias("id_clasificacion_cliente_padre"),
             col("irc.cod_giro").alias("cod_clasificacion_cliente"),
             col("mgv.desc_giro").alias("nomb_clasificacion_cliente"),
             lit("Giro").alias("cod_tipo_clasificacion_cliente"),
@@ -71,7 +89,11 @@ try:
         )
         .select(
             col("mp.id_pais").alias("id_pais"),
-            concat(trim(col("irc.cod_compania")), lit("|"), lit("CN"), lit("|"), trim(col("irc.cod_canal"))).alias("id_clasificacion_cliente"),
+            concat_ws("|",
+                      trim(col("irc.cod_compania")), 
+                      lit("CN"), 
+                      trim(col("irc.cod_canal"))
+                      ).alias("id_clasificacion_cliente"),
             lit(None).alias("id_clasificacion_cliente_padre"),
             col("irc.cod_canal").alias("cod_clasificacion_cliente"),
             col("mcv.desc_canal").alias("nomb_clasificacion_cliente"),
@@ -105,7 +127,7 @@ try:
     partition_columns_array = ["id_pais"]
     logger.info(f"starting upsert of {target_table_name}")
     spark_controller.upsert(df_dom_m_clasificacion_cliente, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
-    logger.info(f"Upsert de {target_table_name} completado exitosamente")
+    logger.info(f"Upsert de {target_table_name} success completed")
 except Exception as e:
     logger.error(f"Error processing df_dom_m_clasificacion_cliente: {e}")
     raise ValueError(f"Error processing df_dom_m_clasificacion_cliente: {e}") 

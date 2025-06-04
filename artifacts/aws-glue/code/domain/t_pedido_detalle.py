@@ -7,13 +7,13 @@ target_table_name = "t_pedido_detalle"
 try:
     PERIODOS= spark_controller.get_periods()
 
-    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", have_principal = True)
-    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania")
-    df_m_parametro = spark_controller.read_table(data_paths.APDAYC, "m_parametro")
-    df_m_articulo = spark_controller.read_table(data_paths.APDAYC, "m_articulo")
-    df_m_procedimiento = spark_controller.read_table(data_paths.APDAYC, "m_procedimiento")
-    df_t_historico_pedido_detalle = spark_controller.read_table(data_paths.APDAYC, "t_documento_pedido_detalle")
-    df_t_historico_pedido_ades_detalle = spark_controller.read_table(data_paths.APDAYC, "t_documento_pedido_ades_detalle") 
+    df_m_pais = spark_controller.read_table(data_paths.BIGMAGIC, "m_pais", have_principal = True)
+    df_m_compania = spark_controller.read_table(data_paths.BIGMAGIC, "m_compania")
+    df_m_parametro = spark_controller.read_table(data_paths.BIGMAGIC, "m_parametro")
+    df_m_articulo = spark_controller.read_table(data_paths.BIGMAGIC, "m_articulo")
+    df_m_procedimiento = spark_controller.read_table(data_paths.BIGMAGIC, "m_procedimiento")
+    df_t_historico_pedido_detalle = spark_controller.read_table(data_paths.BIGMAGIC, "t_documento_pedido_detalle")
+    df_t_historico_pedido_ades_detalle = spark_controller.read_table(data_paths.BIGMAGIC, "t_documento_pedido_ades_detalle") 
 
     logger.info("Dataframes load successfully")
 except Exception as e:
@@ -421,7 +421,7 @@ try:
     logger.info(f"starting write of {target_table_name}")
     partition_columns_array = ["id_pais", "id_periodo"]
     spark_controller.write_table(df_dom_t_pedido_detalle, data_paths.DOMAIN, target_table_name, partition_columns_array)
-    logger.info(f"Write de {target_table_name} completado exitosamente")
+    logger.info(f"Write de {target_table_name} success completed")
 except Exception as e:
     logger.error(f"Error processing df_dom_t_pedido_detalle: {e}")
     raise ValueError(f"Error processing df_dom_t_pedido_detalle: {e}")

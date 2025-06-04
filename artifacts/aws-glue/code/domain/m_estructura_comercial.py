@@ -6,13 +6,13 @@ from pyspark.sql.types import StringType, DateType, TimestampType
 spark_controller = SPARK_CONTROLLER() 
 target_table_name = "m_estructura_comercial"
 try: 
-    df_m_ruta_distribucion = spark_controller.read_table(data_paths.APDAYC, "m_ruta")
-    df_m_zona_distribucion = spark_controller.read_table(data_paths.APDAYC, "m_zona")
-    df_m_centro_distribucion = spark_controller.read_table(data_paths.APDAYC, "m_division")
-    df_m_subregion = spark_controller.read_table(data_paths.APDAYC, "m_subregion")
-    df_m_region = spark_controller.read_table(data_paths.APDAYC, "m_region")
-    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania")
-    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", have_principal = True)
+    df_m_ruta_distribucion = spark_controller.read_table(data_paths.BIGMAGIC, "m_ruta")
+    df_m_zona_distribucion = spark_controller.read_table(data_paths.BIGMAGIC, "m_zona")
+    df_m_centro_distribucion = spark_controller.read_table(data_paths.BIGMAGIC, "m_division")
+    df_m_subregion = spark_controller.read_table(data_paths.BIGMAGIC, "m_subregion")
+    df_m_region = spark_controller.read_table(data_paths.BIGMAGIC, "m_region")
+    df_m_compania = spark_controller.read_table(data_paths.BIGMAGIC, "m_compania")
+    df_m_pais = spark_controller.read_table(data_paths.BIGMAGIC, "m_pais", have_principal = True)
 except Exception as e:
     logger.error(f"Error reading tables: {e}")
     raise ValueError(f"Error reading tables: {e}")  
@@ -49,7 +49,7 @@ try:
             col("cod_ruta").cast("string").alias("cod_estructura_comercial"),
             col("desc_ruta").alias("nomb_estructura_comercial"),
             lit("Ruta").alias("cod_tipo_estructura_comercial"),
-            col("mrd.es_activo"),
+            col("mrd.es_activo").alias("estado"),
             current_date().alias("fecha_creacion"),
             current_date().alias("fecha_modificacion"),
         )
@@ -106,7 +106,7 @@ try:
         df_m_centro_distribucion.alias("mrd")
         .join(
             df_m_zona_distribucion_distinct.alias("mzd"),
-            col("mrd.cod_compania") == col("mzd.cod_compania") & col("mrd.cod_division") == col("mzd.cod_centro_distribucion"),
+            (col("mrd.cod_compania") == col("mzd.cod_compania")) & (col("mrd.cod_division") == col("mzd.cod_centro_distribucion")),
             "inner",
         )
         .join(
@@ -165,7 +165,7 @@ try:
             trim(col("cod_subregion").cast("string")).alias("cod_estructura_comercial"),
             col("msr.desc_subregion").alias("nomb_estructura_comercial"),
             lit("Subregión").alias("cod_tipo_estructura_comercial"),
-            col("msr.es_activo"),
+            col("msr.es_activo").alias("estado"),
             current_date().alias("fecha_creacion"),
             current_date().alias("fecha_modificacion"),
         )
@@ -186,7 +186,7 @@ try:
             trim(col("cod_region").cast("string")).alias("cod_estructura_comercial"),
             col("mrd.desc_region").alias("nomb_estructura_comercial"),
             lit("Región").alias("cod_tipo_estructura_comercial"),
-            col("mrd.es_activo"),
+            col("mrd.es_activo").alias("estado"),
             current_date().alias("fecha_creacion"),
             current_date().alias("fecha_modificacion"),
         )
@@ -214,7 +214,7 @@ try:
     partition_columns_array = ["id_pais"]
     logger.info(f"starting upsert of {target_table_name}")
     spark_controller.upsert(df_dom_m_estructura_comercial, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
-    logger.info(f"Upsert de {target_table_name} completado exitosamente")
+    logger.info(f"Upsert de {target_table_name} success completed")
 except Exception as e:
     logger.error(f"Error processing df_dom_m_estructura_comercial: {e}")
     raise ValueError(f"Error processing df_dom_m_estructura_comercial: {e}") 

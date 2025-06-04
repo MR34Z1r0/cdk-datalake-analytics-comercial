@@ -1,43 +1,102 @@
-from common_jobs_functions import data_paths, logger, COD_PAIS, SPARK_CONTROLLER
+from common_jobs_functions import data_paths, logger, SPARK_CONTROLLER
 from pyspark.sql.functions import coalesce, col, date_format, lit, when
 
 spark_controller = SPARK_CONTROLLER()
 target_table_name = "t_movimiento_inventario"
-
 try:
-    cod_pais = COD_PAIS.split(",")
-    periodos= spark_controller.get_periods()
-    logger.info(periodos)
+    PERIODOS= spark_controller.get_periods()
+    logger.info(f"Periods to filter: {PERIODOS}")
 
-    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
-    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais, have_principal=True)
-    m_documento_almacen = spark_controller.read_table(data_paths.APDAYC, "m_documento_almacen", cod_pais=cod_pais)
-    m_documento_transaccion = spark_controller.read_table(data_paths.APDAYC, "m_documento_transaccion", cod_pais=cod_pais)
-    t_movimiento_inventario = spark_controller.read_table(data_paths.APDAYC, "t_movimiento_inventario", cod_pais=cod_pais)
-    t_movimiento_inventario_transito = spark_controller.read_table(data_paths.APDAYC, "t_movimiento_inventario_transito", cod_pais=cod_pais)
+    df_m_compania = spark_controller.read_table(data_paths.BIGMAGIC, "m_compania")
+    df_m_pais = spark_controller.read_table(data_paths.BIGMAGIC, "m_pais", have_principal=True)
+    df_m_parametro = spark_controller.read_table(data_paths.BIGMAGIC, "m_parametro")
+    df_m_documento_almacen = spark_controller.read_table(data_paths.BIGMAGIC, "m_documento_almacen")
+    df_m_documento_transaccion = spark_controller.read_table(data_paths.BIGMAGIC, "m_documento_transaccion")
+
+    df_t_movimiento_inventario = spark_controller.read_table(data_paths.BIGMAGIC, "t_movimiento_inventario")
+    df_t_movimiento_inventario_transito = spark_controller.read_table(data_paths.BIGMAGIC, "t_movimiento_inventario_transito")
     
+    logger.info("Dataframes load successfully")   
 except Exception as e:
-    logger.error(e)
-    raise
+    logger.error(f"Error reading tables: {e}")
+    raise ValueError(f"Error reading tables: {e}")
 try:
-    m_pais = m_pais.filter(col("id_pais").isin(cod_pais))
-    t_movimiento_inventario = t_movimiento_inventario.filter(date_format(col("fecha_almacen"), "yyyyMM").isin(periodos))
-    m_documento_almacen = (
-        m_documento_almacen.alias("mda")
-        .join(m_documento_transaccion.alias("mdt"), (col("mda.cod_compania") == col("mdt.cod_compania")) & (col("mda.cod_transaccion") == col("mdt.cod_documento_transaccion")), "inner")
-        .select(col("mda.*"))
-    )
-    t_movimiento_inventario = (
-        t_movimiento_inventario.alias("tmi")
-        .join(m_documento_almacen.alias("mda"), (col("tmi.cod_compania") == col("mda.cod_compania")) & (col("tmi.cod_procedimiento") == col("mda.cod_transaccion")), "inner")
-        .select(col("tmi.*"))
+    df_t_movimiento_inventario = df_t_movimiento_inventario.filter(date_format(col("fecha_almacen"), "yyyyMM").isin(PERIODOS))
+
+    logger.info("starting creation of df_m_compania")
+    df_m_compania = (
+        df_m_compania.alias("mc")
+        .join(
+            df_m_parametro.alias("mpar"),
+            col("mpar.id_compania") == col("mc.id_compania"),
+            "left",
+        )
+        .join(
+            df_m_pais.alias("mp"),
+            col("mp.cod_pais") == col("mc.cod_pais"),
+        )
+        .select(col("mp.id_pais"), col("mc.cod_compania").alias("id_compania"), col("mc.cod_compania"), col("mc.cod_pais"), col("mpar.cod_moneda_mn").alias("moneda_mn"))
+    ).cache()
+
+    df_m_documento_almacen = (
+        df_m_documento_almacen.alias("mda")
+        .join(df_m_documento_transaccion.alias("mdt"), 
+              (col("mda.cod_compania") == col("mdt.cod_compania")) & 
+              (col("mda.cod_transaccion") == col("mdt.cod_documento_transaccion")), "inner")
+        .select(
+            col("mda.cod_compania"),
+            col("mda.cod_transaccion")
+        )
     )
 
-    tmp_dominio_t_movimiento_inventario = (
-        t_movimiento_inventario.alias("tmi")
-        .join(m_compania.alias("mc"), col("tmi.cod_compania") == col("mc.cod_compania"), "inner")
-        .join(m_pais.alias("mp"), col("mp.cod_pais") == col("mc.cod_pais"), "inner")
-        .join(t_movimiento_inventario_transito.alias("tmit"), (col("tmi.id_documento_almacen") == col("tmit.id_documento_almacen")), "left")
+    df_t_movimiento_inventario = (
+        df_t_movimiento_inventario.alias("tmi")
+        .join(df_m_documento_almacen.alias("mda"), 
+              (col("tmi.cod_compania") == col("mda.cod_compania")) & 
+              (col("tmi.cod_procedimiento") == col("mda.cod_transaccion")), "inner")
+        .select(
+            col("tmi.id_movimiento_almacen"),
+            col("tmi.id_movimiento_ingreso"),
+            col("tmi.cod_compania"),
+            col("tmi.id_sucursal"),
+            col("tmi.id_almacen"),
+            col("tmi.id_compania_referencia"),
+            col("tmi.id_sucursal_referencia"),
+            col("tmi.id_almacen_referencia"),
+            col("tmi.id_transportista"),
+            col("tmi.id_vehiculo"),
+            col("tmi.id_vendedor"),
+            col("tmi.id_persona"),
+            col("tmi.id_procedimiento"),
+            col("tmi.cod_procedimiento"),
+            col("tmi.fecha_emision"),
+            col("tmi.fecha_liquidacion"),
+            col("tmi.fecha_almacen"),
+            col("tmi.nro_documento_almacen"),
+            col("tmi.nro_documento_movimiento"),
+            col("tmi.cod_estado_comprobante"),
+            col("tmi.nro_serie_alm"),
+            col("tmi.nropricoal"),
+            col("tmi.cod_tipo_documento_liquidacion"),
+            col("tmi.nro_documento_liquidacion"),
+            col("tmi.cod_documento_transaccion"),
+            col("tmi.cod_documento_transaccion1"),
+            col("tmi.nro_documento_almacen1"),
+            col("tmi.cod_tipo_documento_referencia2"),
+            col("tmi.nro_documento_almacen_referencia2"),
+            col("tmi.usuario_creacion"),
+            col("tmi.fecha_creacion"),
+            col("tmi.usuario_modificacion"),
+            col("tmi.fecha_modificacion"),
+            col("tmi.id_documento_almacen")
+        )
+    )
+
+    df_dom_t_movimiento_inventario = (
+        df_t_movimiento_inventario.alias("tmi")
+        .join(df_m_compania.alias("mc"), col("tmi.cod_compania") == col("mc.cod_compania"), "inner")
+        .join(df_m_pais.alias("mp"), col("mp.cod_pais") == col("mc.cod_pais"), "inner")
+        .join(df_t_movimiento_inventario_transito.alias("tmit"), (col("tmi.id_documento_almacen") == col("tmit.id_documento_almacen")), "left")
         .select(
             col("mp.id_pais").alias("id_pais"),
             date_format(col("tmi.fecha_almacen"), "yyyyMM").alias("id_periodo"),
@@ -85,7 +144,7 @@ try:
         )
     )
 
-    tmp = tmp_dominio_t_movimiento_inventario.select(
+    df_dom_t_movimiento_inventario = df_dom_t_movimiento_inventario.select(
         col("id_pais").cast("string").alias("id_pais"),
         col("id_periodo").cast("string").alias("id_periodo"),
         col("id_movimiento_almacen").cast("string").alias("id_movimiento_almacen"),
@@ -130,9 +189,10 @@ try:
 
     )
 
+    logger.info(f"starting write of {target_table_name}")
     partition_columns_array = ["id_pais", "id_periodo"]
-    spark_controller.write_table(tmp, data_paths.DOMAIN , target_table_name, partition_columns_array)
-
+    spark_controller.write_table(df_dom_t_movimiento_inventario, data_paths.DOMAIN , target_table_name, partition_columns_array)
+    logger.info(f"Write de {target_table_name} success completed")
 except Exception as e:
-    logger.error(e)
-    raise
+    logger.error(f"Error processing df_dom_t_movimiento_inventario: {e}")
+    raise ValueError(f"Error processing df_dom_t_movimiento_inventario: {e}")

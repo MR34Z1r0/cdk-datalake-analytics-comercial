@@ -5,41 +5,57 @@ from pyspark.sql.window import Window
 spark_controller = SPARK_CONTROLLER()
 target_table_name = "t_reparto"
 try:
-    periodos= spark_controller.get_periods()
-    logger.info(periodos)
+    PERIODOS= spark_controller.get_periods()
+    logger.info(f"Periods to filter: {PERIODOS}")
 
-    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", have_principal=True)
-    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania")
-    t_movimiento_inventario = spark_controller.read_table(data_paths.APDAYC, "t_movimiento_inventario")
+    df_m_pais = spark_controller.read_table(data_paths.BIGMAGIC, "m_pais", have_principal=True)
+    df_m_compania = spark_controller.read_table(data_paths.BIGMAGIC, "m_compania")
+    df_m_parametro = spark_controller.read_table(data_paths.BIGMAGIC, "m_parametro")
+    df_t_movimiento_inventario = spark_controller.read_table(data_paths.BIGMAGIC, "t_movimiento_inventario")
 
+    logger.info("Dataframes load successfully")
 except Exception as e:
     logger.error(f"Error reading tables: {e}")
     raise ValueError(f"Error reading tables: {e}")
-
 try:
+    logger.info("starting creation of df_m_compania")
     df_m_compania = (
-        m_compania.alias("mc")
-        .join(m_pais.alias("mp"), col("mp.cod_pais") == col("mc.cod_pais"), "inner")
-        .select(col("mc.cod_compania"), col("mp.id_pais"))
-    )
-    t_movimiento_inventario_filtered = t_movimiento_inventario.filter(
-        (date_format(col("fecha_almacen"), "yyyyMM").isin(periodos))
+        df_m_compania.alias("mc")
+        .join(
+            df_m_parametro.alias("mpar"),
+            col("mpar.id_compania") == col("mc.id_compania"),
+            "left",
+        )
+        .join(
+            df_m_pais.alias("mp"),
+            col("mp.cod_pais") == col("mc.cod_pais"),
+        )
+        .select(col("mp.id_pais"), col("mc.cod_compania").alias("id_compania"), col("mc.cod_compania"), col("mc.cod_pais"), col("mpar.cod_moneda_mn").alias("moneda_mn"))
+    ).cache()
+
+    df_t_movimiento_inventario_filtered = df_t_movimiento_inventario.filter(
+        (date_format(col("fecha_almacen"), "yyyyMM").isin(PERIODOS))
         & (col("cod_documento_transaccion").isin("GRA", "NIN"))
     )
 
-    t_movimiento_inventario_filtered = t_movimiento_inventario_filtered.withColumn(
+    df_t_movimiento_inventario_filtered = df_t_movimiento_inventario_filtered.withColumn(
         "id_reparto",
-        concat_ws("|", col("cod_compania"), col("cod_sucursal"), col("cod_almacen_emisor_origen"), col("cod_documento_transaccion"), col("nro_documento_almacen"))
+        concat_ws("|", 
+                  col("cod_compania"), 
+                  col("cod_sucursal"), 
+                  col("cod_almacen_emisor_origen"), 
+                  col("cod_documento_transaccion"), 
+                  col("nro_documento_almacen"))
     )  
 
     window_spec = Window.partitionBy("id_reparto").orderBy(desc("nro_documento_movimiento"))
 
-    t_movimiento_inventario_filtered = t_movimiento_inventario_filtered.withColumn("orden", row_number().over(window_spec))
+    df_t_movimiento_inventario_filtered = df_t_movimiento_inventario_filtered.withColumn("orden", row_number().over(window_spec))
 
-    t_movimiento_inventario_filtered = t_movimiento_inventario_filtered.filter(col("orden") == 1)
+    df_t_movimiento_inventario_filtered = df_t_movimiento_inventario_filtered.filter(col("orden") == 1)
 
-    tmp_final = (
-        t_movimiento_inventario_filtered.alias("tmi")
+    df_dom_t_reparto = (
+        df_t_movimiento_inventario_filtered.alias("tmi")
         .join(df_m_compania.alias("mc"), "cod_compania", "inner")
         .select(
             col("mc.id_pais").alias("id_pais"),
@@ -57,7 +73,7 @@ try:
         )
     )
 
-    df_dom_t_reparto = tmp_final.select(
+    df_dom_t_reparto = df_dom_t_reparto.select(
         col("id_pais").cast("string").alias("id_pais"),
         col("id_periodo").cast("string").alias("id_periodo"),
         col("id_reparto").cast("string").alias("id_reparto"),
@@ -72,11 +88,11 @@ try:
 
     )
 
-    partition_columns_array = ["id_pais", "id_periodo"]
     logger.info(f"starting upsert of {target_table_name}")
+    partition_columns_array = ["id_pais", "id_periodo"]
     spark_controller.write_table(df_dom_t_reparto, data_paths.DOMAIN, target_table_name, partition_columns_array)
-    logger.info(f"Upsert of {target_table_name} finished") 
+    logger.info(f"Upsert of {target_table_name} finished completed") 
 
 except Exception as e:
-    logger.error(f"Error processing df_t_reparto: {e}")
-    raise ValueError(f"Error processing df_t_reparto: {e}")
+    logger.error(f"Error processing df_dom_t_reparto: {e}")
+    raise ValueError(f"Error processing df_dom_t_reparto: {e}")

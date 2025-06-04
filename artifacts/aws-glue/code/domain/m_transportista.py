@@ -5,11 +5,11 @@ spark_controller = SPARK_CONTROLLER()
 target_table_name = "m_transportista"
 
 try:
-    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania")
-    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", have_principal = True)
-    m_transportista = spark_controller.read_table(data_paths.APDAYC, "m_transportista")
-    m_persona = spark_controller.read_table(data_paths.APDAYC, "m_persona")
-    m_tipo_transportista = spark_controller.read_table(data_paths.APDAYC, "m_tipo_transportista")
+    m_compania = spark_controller.read_table(data_paths.BIGMAGIC, "m_compania")
+    m_pais = spark_controller.read_table(data_paths.BIGMAGIC, "m_pais", have_principal = True)
+    m_transportista = spark_controller.read_table(data_paths.BIGMAGIC, "m_transportista")
+    m_persona = spark_controller.read_table(data_paths.BIGMAGIC, "m_persona")
+    m_tipo_transportista = spark_controller.read_table(data_paths.BIGMAGIC, "m_tipo_transportista")
 
 except Exception as e:
     logger.error(f"Error reading tables: {e}")

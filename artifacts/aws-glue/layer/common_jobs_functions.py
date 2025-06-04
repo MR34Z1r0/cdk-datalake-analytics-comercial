@@ -70,7 +70,10 @@ logger.info(f"project name: {PROJECT_NAME} | flow name:  {FLOW_NAME} | process n
 #logger.info(f"COD_PAIS: {COD_PAIS}")
 logger.info(f"INSTANCIAS: {INSTANCIAS}")
 
-DATA_SOURCES = ["apdayc"]
+DOMAIN_LAYER = "domain"
+ANALYTICS_LAYER = "analytics"
+STAGE_LAYER_BIGMAGIC = "apdayc" # BigMagic data source
+
 INSTANCES = INSTANCIAS.split(",")
 
 s3 = boto3.client('s3')
@@ -79,9 +82,9 @@ dynamodb_resource = boto3.resource('dynamodb')
 dynamodb_client = boto3.client('dynamodb')
 
 class data_paths:
-    ANALYTICS = f"{S3_PATH_ANALYTICS}{BUSINESS_PROCESS}/analytics/"
-    DOMAIN = f"{S3_PATH_ANALYTICS}{BUSINESS_PROCESS}/domain/"
-    APDAYC = f"{S3_PATH_STG}apdayc/"
+    ANALYTICS = f"{S3_PATH_ANALYTICS}{BUSINESS_PROCESS}/{ANALYTICS_LAYER}/"
+    DOMAIN = f"{S3_PATH_ANALYTICS}{BUSINESS_PROCESS}/{DOMAIN_LAYER}/"
+    BIGMAGIC = f"{S3_PATH_STG}{STAGE_LAYER_BIGMAGIC}/"
     EXTERNAL = f"{S3_PATH_EXTERNAL}"
     ARTIFACTS_CSV = f"{S3_PATH_ARTIFACTS_CSV}"
     
@@ -124,7 +127,7 @@ class SPARK_CONTROLLER():
         para la tabla sofia-dev-datalake-columns-specifications-ddb
         """
         try:
-            if path == data_paths.APDAYC:
+            if path == data_paths.BIGMAGIC:
                 if len(INSTANCES) == 0:
                     logger.error(f"No hay instancias definidas para la tabla {table_name}")
                     # Crear un DataFrame vacío básico si no hay especificaciones
@@ -139,7 +142,7 @@ class SPARK_CONTROLLER():
                 response = database_table.scan(
                     FilterExpression=Attr('TEAM').eq(TEAM) & 
                                 Attr('IS_PRINCIPAL').eq(True) & 
-                                Attr('DATA_SOURCE').eq('apdayc') &
+                                Attr('DATA_SOURCE').eq(STAGE_LAYER_BIGMAGIC) &
                                 Attr('INSTANCE').eq(INSTANCES[0])
                 )
 
@@ -156,7 +159,7 @@ class SPARK_CONTROLLER():
                 response = columns_table.scan(
                     FilterExpression=Attr('TABLE_NAME').eq(table_name.upper()) & 
                                 Attr('TEAM').eq(TEAM) & 
-                                Attr('DATA_SOURCE').eq('apdayc') &
+                                Attr('DATA_SOURCE').eq(STAGE_LAYER_BIGMAGIC) &
                                 Attr('ENDPOINT_NAME').eq(ENDPOINT_NAME)
                 )
 
@@ -225,10 +228,10 @@ class SPARK_CONTROLLER():
                 else:
                     df = self.spark.read.format("csv").option("sep", ";").option("header", "true").load(s3_path)
 
-            elif path == data_paths.APDAYC:
+            elif path == data_paths.BIGMAGIC:
                 table = dynamodb_resource.Table(DYNAMODB_DATABASE_NAME)
                 response = table.scan(
-                    FilterExpression=Attr('DATA_SOURCE').eq('apdayc') & 
+                    FilterExpression=Attr('DATA_SOURCE').eq(STAGE_LAYER_BIGMAGIC) & 
                                     Attr('TEAM').eq(TEAM) & 
                                     Attr('INSTANCE').is_in(INSTANCES)
                 )

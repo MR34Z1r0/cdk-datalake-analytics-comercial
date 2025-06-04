@@ -6,10 +6,10 @@ from pyspark.sql.types import StringType, IntegerType, DecimalType, TimestampTyp
 spark_controller = SPARK_CONTROLLER()
 target_table_name = "m_responsable_comercial"
 try: 
-    df_m_vendedor = spark_controller.read_table(data_paths.APDAYC, "m_vendedor")
-    df_m_persona = spark_controller.read_table(data_paths.APDAYC, "m_persona")
-    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais",have_principal = True)
-    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania")
+    df_m_vendedor = spark_controller.read_table(data_paths.BIGMAGIC, "m_vendedor")
+    df_m_persona = spark_controller.read_table(data_paths.BIGMAGIC, "m_persona")
+    df_m_pais = spark_controller.read_table(data_paths.BIGMAGIC, "m_pais",have_principal = True)
+    df_m_compania = spark_controller.read_table(data_paths.BIGMAGIC, "m_compania")
 except Exception as e:
     logger.error(f"Error reading tables: {e}")
     raise ValueError(f"Error reading tables: {e}")  
@@ -46,7 +46,7 @@ try:
     partition_columns_array = ["id_pais"]
     logger.info(f"starting upsert of {target_table_name}")
     spark_controller.upsert(df_dom_m_responsable_comercial, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
-    logger.info(f"Upsert de {target_table_name} completado exitosamente")
+    logger.info(f"Upsert de {target_table_name} success completed")
 except Exception as e:
     logger.error(f"Error processing df_dom_m_responsable_comercial: {e}")
     raise ValueError(f"Error processing df_dom_m_responsable_comercial: {e}")

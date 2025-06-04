@@ -6,8 +6,8 @@ from pyspark.sql.types import StringType, DateType
 spark_controller = SPARK_CONTROLLER()
 target_table_name = "m_compania"
 try:
-    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania")
-    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", have_principal = True)
+    m_compania = spark_controller.read_table(data_paths.BIGMAGIC, "m_compania")
+    m_pais = spark_controller.read_table(data_paths.BIGMAGIC, "m_pais", have_principal = True)
 except Exception as e:
     logger.error(f"Error reading tables: {e}")
     raise ValueError(f"Error reading tables: {e}")  
@@ -33,7 +33,7 @@ try:
     partition_columns_array = ["id_pais"]
     logger.info(f"starting upsert of {target_table_name}")
     spark_controller.upsert(df_dom_m_compania, data_paths.DOMAIN, target_table_name, id_columns, partition_columns_array)
-    logger.info(f"Upsert de {target_table_name} completado exitosamente")
+    logger.info(f"Upsert de {target_table_name} success completed")
 except Exception as e:
     logger.error(f"Error processing df_dom_m_compania: {e}")
     raise ValueError(f"Error processing df_dom_m_compania: {e}") 

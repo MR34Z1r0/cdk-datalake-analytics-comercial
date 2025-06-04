@@ -1,64 +1,66 @@
-from common_jobs_functions import data_paths, logger, COD_PAIS, SPARK_CONTROLLER
+from common_jobs_functions import data_paths, logger, SPARK_CONTROLLER
 from pyspark.sql.functions import coalesce, col, concat_ws, date_format, first, lit, max, sum, when, row_number
 from pyspark.sql.window import Window
 
 spark_controller = SPARK_CONTROLLER()
-
+target_table_name = "t_saldos_iniciales"
 try:
-    cod_pais = COD_PAIS.split(",")
-    periodos= spark_controller.get_periods()
-    logger.info(periodos)
+    PERIODOS= spark_controller.get_periods()
+    logger.info(f"Periods to filter: {PERIODOS}")
 
-    m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania", cod_pais=cod_pais)
-    m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais", cod_pais=cod_pais, have_principal=True)
-    m_parametro = spark_controller.read_table(data_paths.APDAYC, "m_parametro", cod_pais=cod_pais, have_principal=True)
-    m_articulo = spark_controller.read_table(data_paths.APDAYC, "m_articulo", cod_pais=cod_pais, have_principal=True)
-    m_tipo_cambio = spark_controller.read_table(data_paths.APDAYC, "m_tipo_cambio", cod_pais=cod_pais, have_principal=True)
-    m_empleado = spark_controller.read_table(data_paths.APDAYC, "m_empleado", cod_pais=cod_pais, have_principal=True)
-    t_toma_inventario = spark_controller.read_table(data_paths.APDAYC, "t_toma_inventario", cod_pais=cod_pais, have_principal=True)
-    t_toma_inventario_detalle = spark_controller.read_table(data_paths.APDAYC, "t_toma_inventario_detalle", cod_pais=cod_pais, have_principal=True)
-    t_cierre_inventario_cpm = spark_controller.read_table(data_paths.APDAYC, "t_cierre_inventario_cpm", cod_pais=cod_pais, have_principal=True)
+    df_m_compania = spark_controller.read_table(data_paths.BIGMAGIC, "m_compania")
+    df_m_pais = spark_controller.read_table(data_paths.BIGMAGIC, "m_pais", have_principal=True)
+    df_m_parametro = spark_controller.read_table(data_paths.BIGMAGIC, "m_parametro", have_principal=True)
+    df_m_articulo = spark_controller.read_table(data_paths.BIGMAGIC, "m_articulo", have_principal=True)
+    df_m_tipo_cambio = spark_controller.read_table(data_paths.BIGMAGIC, "m_tipo_cambio", have_principal=True)
+    df_m_empleado = spark_controller.read_table(data_paths.BIGMAGIC, "m_empleado", have_principal=True)
 
-    target_table_name = "t_saldos_iniciales"
+    df_t_toma_inventario = spark_controller.read_table(data_paths.BIGMAGIC, "t_toma_inventario", have_principal=True)
+    df_t_toma_inventario_detalle = spark_controller.read_table(data_paths.BIGMAGIC, "t_toma_inventario_detalle", have_principal=True)
+    df_t_cierre_inventario_cpm = spark_controller.read_table(data_paths.BIGMAGIC, "t_cierre_inventario_cpm", have_principal=True)
 
+    logger.info("Dataframes load successfully")
 except Exception as e:
-    logger.error(e)
-    raise
-
+    logger.error(f"Error reading tables: {e}")
+    raise ValueError(f"Error reading tables: {e}")
 try:
-    m_pais = m_pais.filter(col("id_pais").isin(cod_pais))
-    m_tipo_cambio = m_tipo_cambio.filter((col("fecha").isNotNull()) & (col("tc_compra") > 0) & (col("tc_venta") > 0))
-    t_toma_inventario = (
-        t_toma_inventario.alias("tti")
-        .join(m_empleado.alias("me"), (col("tti.cod_compania") == col("me.cod_compania")) & (col("tti.cod_empleado_aprobador") == col("me.cod_empleado")), "inner")
+    logger.info("starting creation of df_m_compania")
+    df_m_compania = (
+        df_m_compania.alias("mc")
+        .join(
+            df_m_parametro.alias("mpar"),
+            col("mpar.id_compania") == col("mc.id_compania"),
+            "left",
+        )
+        .join(
+            df_m_pais.alias("mp"),
+            col("mp.cod_pais") == col("mc.cod_pais"),
+        )
+        .select(col("mp.id_pais"), col("mc.cod_compania").alias("id_compania"), col("mc.cod_compania"), col("mc.cod_pais"), col("mpar.cod_moneda_mn").alias("moneda_mn"))
+    ).cache()
+
+    df_t_toma_inventario = (
+        df_t_toma_inventario.alias("tti")
+        .join(df_m_empleado.alias("me"), 
+              (col("tti.cod_compania") == col("me.cod_compania")) & 
+              (col("tti.cod_empleado_aprobador") == col("me.cod_empleado")), "inner")
         .select(col("tti.*"))
     )
-
-    m_compania = (
-        m_compania.alias("mc")
-        .join(m_parametro.alias("mp"), col("mp.id_compania") == col("mc.id_compania"), "left")
-        .select(
-            col("mc.*"), 
-            col("mp.cod_moneda_mn").alias("moneda_mn"))
-    )
-    # logger.info(f"m_compania count: {m_compania.count()}")
     
-    logger.info("Starting creation of tmp_t_saldos_iniciales")
-
-    tmp_t_saldos_iniciales = (
-        t_toma_inventario.alias("tti")
-        .filter(date_format(col("tti.fecha_inventario"), "yyyyMM").isin(periodos))
-        .join(t_toma_inventario_detalle.alias("ttid"), 
-            (col("tti.id_sucursal") == col("ttid.id_sucursal")) 
-            & (col("tti.cod_almacen_emisor") == col("ttid.cod_almacen_emisor")) 
-            & (col("tti.fecha_inventario") == col("ttid.fecha_inventario"))
-            , "inner"
-        )
-        .join(m_articulo.alias("ma"), col("ma.id_articulo") == col("ttid.id_articulo"), "inner")
-        .join(m_compania.alias("mc"), col("tti.id_compania") == col("mc.id_compania"), "inner")
-        .join(m_pais.alias("mp"), col("mp.cod_pais") == col("mc.cod_pais"), "inner")
+    logger.info("Starting creation of df_tmp_toma_inventario_detalle")
+    df_tmp_toma_inventario_detalle = (
+        df_t_toma_inventario.alias("tti")
+        .filter(date_format(col("tti.fecha_inventario"), "yyyyMM").isin(PERIODOS))
+        .join(df_t_toma_inventario_detalle.alias("ttid"), 
+            (col("tti.id_sucursal") == col("ttid.id_sucursal")) & 
+            (col("tti.cod_almacen_emisor") == col("ttid.cod_almacen_emisor"))&
+            (col("tti.fecha_inventario") == col("ttid.fecha_inventario")), "inner")
+        .join(df_m_articulo.alias("ma"), 
+              col("ma.id_articulo") == col("ttid.id_articulo"), "inner")
+        .join(df_m_compania.alias("mc"), 
+              col("tti.id_compania") == col("mc.id_compania"), "inner")
         .select(
-            col("mp.id_pais"),
+            col("mc.id_pais"),
             date_format(col("tti.fecha_inventario"), "yyyyMM").alias("id_periodo"),
             col("tti.id_compania"),
             col("tti.id_sucursal"),
@@ -73,17 +75,23 @@ try:
             col("tti.fecha_creacion").alias("fecha_creacion"),
             col("tti.usuario_modificacion").alias("usuario_modificacion"),
             col("tti.fecha_modificacion").alias("fecha_modificacion"),
-            lit("1").alias("es_eliminado")
+            lit("0").alias("es_eliminado")
         )
     )
-    # logger.info(f"tmp_t_saldos_iniciales count: {tmp_t_saldos_iniciales.count()}")
 
-    logger.info("Starting creation of tmp_t_saldos_iniciales_valorizado")
-    tmp_t_saldos_iniciales_valorizado = (
-        tmp_t_saldos_iniciales.alias("tmp")
-        .join(t_cierre_inventario_cpm.alias("cpm"), ((col("tmp.id_sucursal") == col("cpm.id_sucursal")) & (col("tmp.id_articulo") == col("cpm.id_articulo")) & (col("tmp.id_periodo") == col("cpm.id_periodo"))), "left")
-        .join(m_articulo.alias("ma"), col("tmp.id_articulo") == col("ma.id_articulo"), "left")
-        .join(m_tipo_cambio.alias("mtc"), ((col("mtc.id_compania") == col("tmp.id_compania")) & (col("mtc.fecha") == col("tmp.fecha_inventario")) & (col("mtc.cod_moneda") == col("tmp.moneda_mn"))), "left")
+    logger.info("Starting creation of df_tmp_toma_inventario_detalle_valorizado")
+    df_tmp_toma_inventario_detalle_valorizado = (
+        df_tmp_toma_inventario_detalle.alias("tmp")
+        .join(df_t_cierre_inventario_cpm.alias("cpm"), 
+              ((col("tmp.id_sucursal") == col("cpm.id_sucursal")) & 
+               (col("tmp.id_articulo") == col("cpm.id_articulo")) & 
+               (col("tmp.id_periodo") == col("cpm.id_periodo"))), "left")
+        .join(df_m_articulo.alias("ma"), 
+              col("tmp.id_articulo") == col("ma.id_articulo"), "left")
+        .join(df_m_tipo_cambio.alias("mtc"), 
+              ((col("mtc.id_compania") == col("tmp.id_compania")) & 
+               (col("mtc.fecha") == col("tmp.fecha_inventario")) & 
+               (col("mtc.cod_moneda") == col("tmp.moneda_mn"))), "left")
         .select(
             col("tmp.id_pais"),
             col("tmp.id_compania"),
@@ -111,7 +119,8 @@ try:
         )
     )
 
-    tmp = tmp_t_saldos_iniciales_valorizado.select(
+    logger.info("Starting creation of df_dom_saldos_iniciales")
+    df_dom_saldos_iniciales = df_tmp_toma_inventario_detalle_valorizado.select(
         col("id_pais").cast("string").alias("id_pais"),
         col("id_compania").cast("string").alias("id_compania"),
         col("id_sucursal").cast("string").alias("id_sucursal"),
@@ -136,11 +145,11 @@ try:
         col("fecha_modificacion").cast("timestamp").alias("fecha_modificacion"),
         col("es_eliminado").cast("int").alias("es_eliminado"),
     )
-    # logger.info(f"tmp_t_saldos_iniciales_valorizado count: {tmp_t_saldos_iniciales_valorizado.count()}")
 
+    logger.info(f"starting upsert of {target_table_name}")
     partition_columns_array = ["id_pais", "id_periodo"]
-    spark_controller.write_table(tmp, data_paths.DOMAIN, target_table_name, partition_columns_array)
-
+    spark_controller.write_table(df_dom_saldos_iniciales, data_paths.DOMAIN, target_table_name, partition_columns_array)
+    logger.info(f"Upsert of {target_table_name} finished completed") 
 except Exception as e:
-    logger.error(e)
-    raise
+    logger.error(f"Error processing df_dom_saldos_iniciales: {e}")
+    raise ValueError(f"Error processing df_dom_saldos_iniciales: {e}")

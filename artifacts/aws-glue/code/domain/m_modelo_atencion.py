@@ -6,9 +6,9 @@ from pyspark.sql.types import StringType, DateType
 spark_controller = SPARK_CONTROLLER()
 target_table_name = "m_modelo_atencion" 
 try:
-    df_m_modelo_atencion = spark_controller.read_table(data_paths.APDAYC, "m_modelo_atencion")
-    df_m_pais = spark_controller.read_table(data_paths.APDAYC, "m_pais",have_principal = True)
-    df_m_compania = spark_controller.read_table(data_paths.APDAYC, "m_compania")
+    df_m_modelo_atencion = spark_controller.read_table(data_paths.BIGMAGIC, "m_modelo_atencion")
+    df_m_pais = spark_controller.read_table(data_paths.BIGMAGIC, "m_pais",have_principal = True)
+    df_m_compania = spark_controller.read_table(data_paths.BIGMAGIC, "m_compania")
 except Exception as e:
     logger.error(f"Error reading tables: {e}")
     raise ValueError(f"Error reading tables: {e}")
