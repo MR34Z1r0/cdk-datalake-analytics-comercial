@@ -20,6 +20,7 @@ id;layer;procedure;glue_version;worker_type;num_workers;exe_order;process_id;per
 20;dominio;m_medio_transporte;4;G.1X;2;1;10;2
 21;dominio;m_transportista;4;G.1X;2;1;10;2
 22;dominio;t_pedido;4;G.1X;4;2;10;2
+22;dominio;t_pedido_detalle;4;G.1X;4;2;10;2
 23;dominio;t_venta_detalle;4;G.1X;4;3;10;2
 24;dominio;t_venta;4;G.1X;4;2;10;2
 25;dominio;t_visita;4;G.1X;4;2;10;2
