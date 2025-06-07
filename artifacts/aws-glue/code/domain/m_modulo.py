@@ -17,33 +17,20 @@ except Exception as e:
 try:
     df_tmp_modulo = (
         df_m_modulo.alias("mm")
-        .join(
-            df_m_sucursal.alias("ms"),
-            (col("ms.cod_compania") == col("mm.cod_compania")) 
-            & (col("ms.cod_sucursal") == col("mm.cod_sucursal")),
-            "inner",
-        )
-        .join(
-            df_m_compania.alias("mc"),
-            col("ms.cod_compania") == col("mc.cod_compania"),
-            "inner",
-        )
-        .join(
-            df_m_ruta.alias("mrd"),
-            (col("mrd.cod_compania") == col("mm.cod_compania")) 
-            & (col("mrd.cod_sucursal") == col("mm.cod_sucursal"))
-            & (col("mrd.cod_fuerza_venta") == col("mm.cod_fuerza_venta"))
-            & (col("mrd.cod_ruta") == col("mm.cod_ruta")),
-            "inner",
-        )
-        .join(df_m_pais.alias("mp"), col("mc.cod_pais") == col("mp.cod_pais"), "inner")
+        .join(df_m_sucursal.alias("ms"),
+            (col("ms.cod_compania") == col("mm.cod_compania")) & 
+            (col("ms.cod_sucursal") == col("mm.cod_sucursal")), "inner")
+        .join(df_m_compania.alias("mc"),
+            col("ms.cod_compania") == col("mc.cod_compania"), "inner")
+        .join(df_m_ruta.alias("mrd"),
+            (col("mrd.cod_compania") == col("mm.cod_compania")) &
+            (col("mrd.cod_sucursal") == col("mm.cod_sucursal")) &
+            (col("mrd.cod_fuerza_venta") == col("mm.cod_fuerza_venta")) &
+            (col("mrd.cod_ruta") == col("mm.cod_ruta")), "inner")
+        .join(df_m_pais.alias("mp"), 
+              col("mc.cod_pais") == col("mp.cod_pais"), "inner")
         .select(
-            concat_ws("|",
-                trim(col("mm.cod_compania")), 
-                trim(col("mm.cod_sucursal")), 
-                col("mm.cod_fuerza_venta"), 
-                trim(col("mm.cod_modulo")),
-            ).alias("id_modulo"),
+            col("mm.id_modulo"),
             col("mp.id_pais"),
             concat_ws("|",
                 trim(col("mm.cod_compania")), 

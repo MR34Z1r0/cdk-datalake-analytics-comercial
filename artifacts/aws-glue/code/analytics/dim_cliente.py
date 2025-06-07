@@ -1,22 +1,20 @@
 import datetime as dt
-from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths, COD_PAIS
+from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths
 from pyspark.sql.functions import col, lit, when, concat, trim, row_number, lower, coalesce, cast
 from pyspark.sql.window import Window
 
 spark_controller = SPARK_CONTROLLER()
 target_table_name = "dim_cliente" 
 try:
-    cod_pais = COD_PAIS.split(",")
-    df_m_cliente = spark_controller.read_table(data_paths.DOMINIO, "m_cliente", cod_pais=cod_pais) 
-    df_m_eje_territorial = spark_controller.read_table(data_paths.DOMINIO, "m_eje_territorial", cod_pais=cod_pais) 
-    df_m_asignacion_modulo = spark_controller.read_table(data_paths.DOMINIO, "m_asignacion_modulo", cod_pais=cod_pais) 
-    df_m_modulo = spark_controller.read_table(data_paths.DOMINIO, "m_modulo", cod_pais=cod_pais) 
-    df_m_modelo_atencion = spark_controller.read_table(data_paths.DOMINIO, "m_modelo_atencion", cod_pais=cod_pais)
-
+    df_m_cliente = spark_controller.read_table(data_paths.DOMAIN, "m_cliente") 
+    df_m_eje_territorial = spark_controller.read_table(data_paths.DOMAIN, "m_eje_territorial") 
+    df_m_asignacion_modulo = spark_controller.read_table(data_paths.DOMAIN, "m_asignacion_modulo") 
+    df_m_modulo = spark_controller.read_table(data_paths.DOMAIN, "m_modulo") 
+    df_m_modelo_atencion = spark_controller.read_table(data_paths.DOMAIN, "m_modelo_atencion") 
     logger.info("Dataframes load successfully")
 except Exception as e:
-    logger.error(e)
-    raise
+    logger.error(f"Error reading tables: {e}")
+    raise ValueError(f"Error reading tables: {e}")
 try:
     logger.info("Starting creation of df_m_asignacion_modulo_filter")
     df_m_asignacion_modulo_filter = (
@@ -143,7 +141,9 @@ try:
 
     id_columns = ["id_cliente"]
     partition_columns_array = ["id_pais"]
-    spark_controller.upsert(df_dim_cliente, data_paths.COMERCIAL, target_table_name, id_columns, partition_columns_array)
+    logger.info(f"starting upsert of {target_table_name}")
+    spark_controller.upsert(df_dim_cliente, data_paths.ANALYTICS, target_table_name, id_columns, partition_columns_array)
+    logger.info(f"Upsert de {target_table_name} success completed")
 except Exception as e:
-    logger.error(e)
-    raise
+    logger.error(f"Error processing df_dim_cliente: {e}")
+    raise ValueError(f"Error processing df_dim_cliente: {e}") 

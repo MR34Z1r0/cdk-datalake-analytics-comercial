@@ -1,5 +1,5 @@
 import datetime as dt
-from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths, COD_PAIS
+from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths
 from pyspark.sql.functions import col, lit, when, concat, trim, row_number, lower, coalesce, cast, upper
 from pyspark.sql.window import Window
 
@@ -7,18 +7,18 @@ spark_controller = SPARK_CONTROLLER()
 target_table_name = "fact_venta_detalle"
 try:
     PERIODOS= spark_controller.get_periods()
-    cod_pais = COD_PAIS.split(",")
-    logger.info(f"Databases: {cod_pais}")
+    logger.info(f"Periods: {PERIODOS}")
     
-    df_m_tipo_venta = spark_controller.read_table(data_paths.DOMINIO, "m_tipo_venta", cod_pais=cod_pais)
-    df_t_venta = spark_controller.read_table(data_paths.DOMINIO, "t_venta", cod_pais=cod_pais)
-    df_t_venta_detalle = spark_controller.read_table(data_paths.DOMINIO, "t_venta_detalle", cod_pais=cod_pais)
-    df_t_pedido = spark_controller.read_table(data_paths.DOMINIO, "t_pedido", cod_pais=cod_pais)
+    df_m_tipo_venta = spark_controller.read_table(data_paths.DOMAIN, "m_tipo_venta")
 
+    df_t_venta = spark_controller.read_table(data_paths.DOMAIN, "t_venta")
+    df_t_venta_detalle = spark_controller.read_table(data_paths.DOMAIN, "t_venta_detalle")
+    df_t_pedido = spark_controller.read_table(data_paths.DOMAIN, "t_pedido")
+    
     logger.info("Dataframes load successfully")
 except Exception as e:
-    logger.error(e)
-    raise
+    logger.error(f"Error reading tables: {e}")
+    raise ValueError(f"Error reading tables: {e}")
 try:
     logger.info("starting filter of pais and periodo") 
     df_t_venta = df_t_venta.filter(col("id_periodo").isin(PERIODOS))
@@ -107,9 +107,10 @@ try:
         )
     )
     
-    logger.info(f"starting write of {target_table_name}")
     partition_columns_array = ["id_pais", "id_periodo"]
-    spark_controller.write_table(df_fact_venta_detalle, data_paths.COMERCIAL, target_table_name, partition_columns_array)
+    logger.info(f"starting upsert of {target_table_name}")
+    spark_controller.write_table(df_fact_venta_detalle, data_paths.ANALYTICS, target_table_name, partition_columns_array)
+    logger.info(f"Upsert de {target_table_name} success completed")     
 except Exception as e:
-    logger.error(e) 
-    raise
+    logger.error(f"Error processing df_fact_venta_detalle: {e}")
+    raise ValueError(f"Error processing df_fact_venta_detalle: {e}") 

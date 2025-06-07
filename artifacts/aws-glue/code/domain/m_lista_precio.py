@@ -1,6 +1,6 @@
 import datetime as dt
 from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths
-from pyspark.sql.functions import col, concat, lit, coalesce, when, trim, row_number,current_date,upper
+from pyspark.sql.functions import col, concat_ws, lit, coalesce, when, trim, row_number,current_date,upper
 from pyspark.sql.types import StringType, DateType
 
 spark_controller = SPARK_CONTROLLER()
@@ -14,24 +14,15 @@ except Exception as e:
     raise ValueError(f"Error reading tables: {e}")
 try:
     logger.info("Starting creation of df_dom_m_lista_precio")
+    
     df_dom_m_lista_precio = (
         df_m_lista_precio.alias("mlp")
-        .join(
-            df_m_compania.alias("mc"),
-            col("mlp.cod_compania") == col("mc.cod_compania"),
-            "inner",
-        )
-        .join(
-            df_m_pais.alias("mp"), 
-            (col("mc.cod_pais") == col("mp.cod_pais")) & (col("mc.id_pais") == col("mp.id_pais")), 
-            "inner"
-        )
+        .join(df_m_compania.alias("mc"),
+            col("mlp.cod_compania") == col("mc.cod_compania"),"inner")
+        .join(df_m_pais.alias("mp"), 
+            col("mc.cod_pais") == col("mp.cod_pais"), "inner")
         .select(
-            concat(
-                trim(col("mlp.cod_compania")),
-                lit("|"),
-                trim(col("mlp.cod_lista_precio")),
-            ).cast(StringType()).alias("id_lista_precio"),
+            col("mlp.id_lista_precio").cast(StringType()).alias("id_lista_precio"),
             col("mp.id_pais").cast(StringType()).alias("id_pais"),
             trim(col("mlp.cod_lista_precio")).cast(StringType()).alias("cod_lista_precio"),
             col("mlp.desc_lista_precio").cast(StringType()).alias("nomb_lista_precio"),

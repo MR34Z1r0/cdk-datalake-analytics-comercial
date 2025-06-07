@@ -37,7 +37,10 @@ try:
             df_m_pais.alias("mp"),
             col("mp.cod_pais") == col("mc.cod_pais"),
         )
-        .select(col("mp.id_pais"), col("mc.cod_compania").alias("id_compania"), col("mc.cod_compania"), col("mc.cod_pais"), col("mpar.cod_moneda_mn").alias("moneda_mn"))
+        .select(col("mp.id_pais"), 
+                col("mc.cod_compania").alias("id_compania"), 
+                col("mc.cod_compania"), col("mc.cod_pais"), 
+                col("mpar.cod_moneda_mn").alias("moneda_mn"))
     ).cache()
 
     logger.info("starting creation of df_m_articulo")
@@ -50,8 +53,8 @@ try:
             "inner",
         )
         .where(
-            (upper(col("ml.flg_linea")) == "TE")  # Manejo de nulls
-            | (
+            (upper(col("ml.flg_linea")) == "TE")  |# Manejo de nulls
+            (
                 (col("ma.cod_linea") == "17") 
                 & (col("ma.cod_familia").isin(["001", "002", "003"]))
             )
@@ -64,27 +67,41 @@ try:
         )
     ).cache()
 
+    logger.info("starting creation of df_m_operacion")
+    df_m_operacion_filter = (
+        df_m_operacion.alias("mo")
+        .select(
+            concat_ws("|", 
+                      col("mo.cod_compania"), 
+                      col("mo.cod_documento_transaccion"), 
+                      col("mo.cod_procedimiento"), 
+                      col("mo.cod_operacion")).alias("id_operacion"),
+            upper(col("mo.cod_tipo_operacion")).alias("cod_tipo_operacion"),
+        )
+    ).cache()
+
     logger.info("starting creation of df_t_historico_venta_filter")
     df_t_historico_venta_filter = (
-        df_t_historico_venta.alias("tp").filter((~col("tp.cod_documento_venta").isin(["CMD", "RMD"]))
-        & (coalesce(col("tp.flg_facglob"), lit("F")) == "F")
-        & (coalesce(col("tp.flg_refact"), lit("F")) == "F")
-        )
+        df_t_historico_venta.alias("tp").filter((~col("tp.cod_documento_venta").isin(["CMD", "RMD"])) &
+        (coalesce(col("tp.flg_facglob"), lit("F")) == "F") &
+        (coalesce(col("tp.flg_refact"), lit("F")) == "F"))
         .join(
             df_m_compania.alias("mc"),
-            col("tp.cod_compania") == col("mc.cod_compania"),
-        )
+            col("tp.cod_compania") == col("mc.cod_compania"), "inner")
         .join(
             df_m_tipo_cambio.alias("mtc"),
-            (col("mtc.fecha") == col("tp.fecha_emision"))
-            & (col("mtc.cod_compania") == col("mc.cod_compania"))
-            & (col("mtc.cod_moneda") == col("mc.moneda_mn")),
-            "left",
-        )
+            (col("mtc.fecha") == col("tp.fecha_emision")) & 
+            (col("mtc.cod_compania") == col("mc.cod_compania")) & 
+            (col("mtc.cod_moneda") == col("mc.moneda_mn")), "left")
         .select(
             col("mc.id_pais"),
             date_format(col("tp.fecha_liquidacion"), "yyyyMM").alias("id_periodo"),
-            concat_ws("|", col("tp.cod_compania"), col("tp.cod_sucursal"),col("cod_almacen"), col("tp.cod_documento_venta"), col("nro_documento_venta")).alias("id_venta"),
+            concat_ws("|", 
+                      col("tp.cod_compania"), 
+                      col("tp.cod_sucursal"),
+                      col("cod_almacen"), 
+                      col("tp.cod_documento_venta"), 
+                      col("nro_documento_venta")).alias("id_venta"),
             col("tp.cod_compania"),
             col("tp.cod_documento_venta"),
             col("tp.cod_procedimiento"),
@@ -97,8 +114,20 @@ try:
     df_t_historico_venta_detalle_filter = (
         df_t_historico_venta_detalle
         .select(
-            concat_ws("|", col("cod_compania"), col("cod_sucursal"), col("cod_almacen"), col("cod_documento_transaccion"), col("nro_comprobante_venta")).alias("id_venta"),
-            concat_ws("|", col("cod_compania"), col("cod_articulo")).alias("id_producto"),
+            concat_ws("|", 
+                      col("cod_compania"), 
+                      col("cod_sucursal"), 
+                      col("cod_almacen"), 
+                      col("cod_documento_transaccion"), 
+                      col("nro_comprobante_venta")).alias("id_venta"),
+            concat_ws("|", 
+                      col("cod_compania"), 
+                      col("cod_articulo")).alias("id_producto"),
+            concat_ws("|", 
+                      col("cod_compania"), 
+                      col("cod_documento_transaccion"), 
+                      col("cod_procedimiento"), 
+                      col("cod_operacion")).alias("id_operacion"),
             col("cod_compania"),
             col("cod_operacion"),
             col("cant_paquete"),
@@ -134,8 +163,8 @@ try:
             "inner",
         )
         .join(
-            df_m_operacion.alias("mo"),
-            (concat_ws("|", col("tv.cod_compania"), col("tv.cod_documento_venta"), col("tv.cod_procedimiento"), col("tvd.cod_operacion"))) == (concat_ws("|", col("mo.cod_compania"), col("mo.cod_documento_transaccion"), col("mo.cod_procedimiento"), col("mo.cod_operacion"))),
+            df_m_operacion_filter.alias("mo"),
+            col("tv.id_operacion") == col("mo.id_operacion"),
             "inner",
         )        
         .select(
@@ -144,7 +173,7 @@ try:
             col("tv.id_venta"),
             col("tvd.id_producto"),
             when(col("tv.cod_documento_venta") == "NCC", -1).otherwise(1).alias("factor"),
-            upper(col("mo.cod_tipo_operacion")).alias("cod_tipo_operacion"),
+            col("mo.cod_tipo_operacion"),
             col("tv.tipo_cambio_mn"),
             col("tv.tipo_cambio_me"),
             col("tvd.cant_paquete"),

@@ -1,6 +1,6 @@
 import datetime as dt
 from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths
-from pyspark.sql.functions import col, concat, lit, coalesce, when, trim, row_number,current_date,upper
+from pyspark.sql.functions import col, lit, coalesce, when, trim, row_number,current_date,upper
 from pyspark.sql.types import StringType
 
 spark_controller = SPARK_CONTROLLER()
@@ -15,26 +15,15 @@ except Exception as e:
     raise ValueError(f"Error reading tables: {e}")
 try:
     logger.info("Starting creation of df_m_fuerza_venta")
+    
     df_dom_m_fuerza_venta = (
     df_m_fuerza_venta.alias("mfv")
-    .join(
-        df_m_compania.alias("mc"),
-        col("mfv.cod_compania") == col("mc.cod_compania"),
-        "inner",
-    )
-    .join(
-        df_m_pais.alias("mp"),
-        (col("mc.cod_pais") == col("mp.cod_pais")) & (col("mc.id_pais") == col("mp.id_pais")),
-        "inner",
-    )
+    .join(df_m_compania.alias("mc"),
+        col("mfv.cod_compania") == col("mc.cod_compania"), "inner")
+    .join(df_m_pais.alias("mp"),
+        col("mc.cod_pais") == col("mp.cod_pais"), "inner")
     .select(
-        concat(
-            trim(col("mfv.cod_compania")),
-            lit("|"),
-            trim(col("mfv.cod_sucursal")),
-            lit("|"),
-            trim(col("mfv.cod_fuerza_venta")),
-        ).cast(StringType()).alias("id_fuerza_venta"),
+        col("mfv.id_fuerza_venta").cast(StringType()).alias("id_fuerza_venta"),
         col("mp.id_pais").cast(StringType()).alias("id_pais"),
         trim(col("mfv.cod_fuerza_venta")).cast(StringType()).alias("cod_fuerza_venta"),
         col("mfv.desc_fuerza_venta").cast(StringType()).alias("desc_fuerza_venta")

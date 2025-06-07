@@ -1,28 +1,26 @@
-from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths, COD_PAIS
+from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths
 from pyspark.sql.functions import col
 
 spark_controller = SPARK_CONTROLLER()
 
 try:
-    cod_pais = COD_PAIS.split(",")
-    periodos= spark_controller.get_periods()
-    logger.info(periodos)
-    t_pedido_detalle_cumplimiento = spark_controller.read_table(data_paths.DOMINIO, "t_pedido_detalle_cumplimiento")
-    t_pedido = spark_controller.read_table(data_paths.DOMINIO, "t_pedido")
-    t_reparto = spark_controller.read_table(data_paths.DOMINIO, "t_reparto")
-    
-    target_table_name = "fact_reparto_detalle"
-    
-except Exception as e:
-    logger.error(e)
-    raise
+    PERIODOS= spark_controller.get_periods()
+    logger.info(f"Periods: {PERIODOS}")
 
+    t_pedido_detalle_cumplimiento = spark_controller.read_table(data_paths.DOMAIN, "t_pedido_detalle_cumplimiento")
+    t_pedido = spark_controller.read_table(data_paths.DOMAIN, "t_pedido")
+    t_reparto = spark_controller.read_table(data_paths.DOMAIN, "t_reparto")
+    
+    target_table_name = "fact_reparto_detalle"    
+except Exception as e:
+    logger.error(f"Error reading tables: {e}")
+    raise ValueError(f"Error reading tables: {e}")
 try:
 
     logger.info("Starting creation of tmp_fact_reparto_detalle")
     tmp_fact_reparto_detalle = (
         t_pedido_detalle_cumplimiento.alias("tpdc")
-        .filter((col("tpdc.id_pais").isin(cod_pais)) & (col("tpdc.id_periodo").isin(periodos)))
+        .filter(col("tpdc.id_periodo").isin(PERIODOS))
         .join(t_pedido.alias("tp"), col("tp.id_pedido") == col("tpdc.id_pedido"), "left")
         .join(t_reparto.alias("tr"), col("tr.id_reparto") == col("tpdc.id_reparto"), "left")
         .select(
@@ -81,7 +79,7 @@ try:
         )
     )
 
-    tmp = (
+    df_fact_reparto_detalle = (
         tmp_fact_reparto_detalle
             .select(
                 col("id_pais").cast("string").alias("id_pais"),
@@ -140,8 +138,9 @@ try:
         )
 
     partition_columns_array = ["id_pais", "id_periodo"]
-    spark_controller.write_table(tmp, data_paths.COMERCIAL, target_table_name, partition_columns_array)
-
+    logger.info(f"starting upsert of {target_table_name}")
+    spark_controller.write_table(df_fact_reparto_detalle, data_paths.ANALYTICS, target_table_name, partition_columns_array)
+    logger.info(f"Upsert de {target_table_name} success completed")     
 except Exception as e:
-    logger.error(e)
-    raise
+    logger.error(f"Error processing df_fact_reparto_detalle: {e}")
+    raise ValueError(f"Error processing df_fact_reparto_detalle: {e}") 

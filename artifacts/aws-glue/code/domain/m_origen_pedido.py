@@ -15,21 +15,16 @@ except Exception as e:
     logger.error(f"Error reading tables: {e}")
     raise ValueError(f"Error reading tables: {e}")
 try:
-    logger.info("Starting creation of df_m_almacen")
+    logger.info("Starting creation of df_m_origen_pedido")
+
     df_dom_m_origen_pedido = (
         df_m_origen_pedido.alias("mtdp")
-        .join(
-            df_m_compania.alias("mc"),
-            col("mtdp.cod_compania") == col("mc.cod_compania"),
-            "inner",
-        )
-        .join(df_m_pais.alias("mp"), col("mc.cod_pais") == col("mp.cod_pais"), "inner")
+        .join(df_m_compania.alias("mc"),
+            col("mtdp.cod_compania") == col("mc.cod_compania"),"inner")
+        .join(df_m_pais.alias("mp"), 
+              col("mc.cod_pais") == col("mp.cod_pais"), "inner")
         .select(
-            concat(
-                trim(col("mtdp.cod_compania")),
-                lit("|"),
-                trim(col("mtdp.cod_origen_pedido"))
-            ).cast(StringType()).alias("id_origen_pedido"),
+            col("mtdp.id_origen_pedido").cast(StringType()).alias("id_origen_pedido"),
             col("mp.id_pais").cast(StringType()).alias("id_pais"),
             trim(col("mtdp.cod_origen_pedido")).cast(StringType()).alias("cod_origen_pedido"),
             col("mtdp.desc_origen_pedido").cast(StringType()).alias("nomb_origen_pedido"),

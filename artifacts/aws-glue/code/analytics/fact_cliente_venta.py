@@ -1,5 +1,5 @@
 import datetime as dt
-from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths, COD_PAIS
+from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths
 from pyspark.sql.functions import col, lit, when, concat, trim, row_number, lower, coalesce, cast, countDistinct,datediff, current_date, to_date, add_months, sum, max
 from pyspark.sql.window import Window
 
@@ -7,20 +7,20 @@ spark_controller = SPARK_CONTROLLER()
 target_table_name = "fact_cliente_venta"
 try:
     PERIODOS= spark_controller.get_periods()
-    cod_pais = COD_PAIS.split(",")
-    logger.info(f"Databases: {cod_pais}")
+    logger.info(f"Periods: {PERIODOS}")
 
-    df_t_venta = spark_controller.read_table(data_paths.DOMINIO, "t_venta", cod_pais=cod_pais)
-    df_t_venta_detalle = spark_controller.read_table(data_paths.DOMINIO, "t_venta_detalle", cod_pais=cod_pais)
-    df_m_tipo_venta = spark_controller.read_table(data_paths.DOMINIO, "m_tipo_venta", cod_pais=cod_pais)
+    df_m_tipo_venta = spark_controller.read_table(data_paths.DOMAIN, "m_tipo_venta")
+
+    df_t_venta = spark_controller.read_table(data_paths.DOMAIN, "t_venta")
+    df_t_venta_detalle = spark_controller.read_table(data_paths.DOMAIN, "t_venta_detalle")
             
-    df_dim_cliente = spark_controller.read_table(data_paths.COMERCIAL, "dim_cliente", cod_pais=cod_pais)
-    df_dim_producto = spark_controller.read_table(data_paths.COMERCIAL, "dim_producto", cod_pais=cod_pais)
+    df_dim_cliente = spark_controller.read_table(data_paths.ANALYTICS, "dim_cliente")
+    df_dim_producto = spark_controller.read_table(data_paths.ANALYTICS, "dim_producto")
 
     logger.info("Dataframes load successfully")
 except Exception as e:
-    logger.error(e)
-    raise
+    logger.error(f"Error reading tables: {e}")
+    raise ValueError(f"Error reading tables: {e}")
 try:
     logger.info("starting filter of pais and periodo") 
     df_t_venta = df_t_venta.filter(col("id_periodo").isin(PERIODOS))
@@ -189,9 +189,7 @@ try:
         )
         .where(
             (col("tv.id_periodo").isin(PERIODOS)) &
-                (col("tv.id_pais").isin(cod_pais)) &
                 (col("tvd.id_periodo").isin(PERIODOS)) &
-                (col("tvd.id_pais").isin(cod_pais)) &
                 (col("dp.cod_unidad_negocio") == '003')
         )
         .groupby(col("tv.id_pais"), col("tv.id_periodo"), col("tv.id_compania"), col("tv.id_cliente"), col("tv.cod_modulo"))
@@ -327,8 +325,7 @@ try:
             "left",
         )
         .where(
-            (col("fcv.id_pais").isin(cod_pais))
-            & (col("fcv.id_periodo").isin(PERIODOS))
+            col("fcv.id_periodo").isin(PERIODOS)
         )
         .select(
             col("fcv.id_pais").cast("string"),
@@ -367,9 +364,10 @@ try:
         )
     )
     
-    logger.info(f"starting write of {target_table_name}")
     partition_columns_array = ["id_pais", "id_periodo"]
-    spark_controller.write_table(df_fact_cliente_venta, data_paths.COMERCIAL, target_table_name, partition_columns_array)
+    logger.info(f"starting upsert of {target_table_name}")
+    spark_controller.write_table(df_fact_cliente_venta, data_paths.ANALYTICS, target_table_name, partition_columns_array)
+    logger.info(f"Upsert de {target_table_name} success completed")     
 except Exception as e:
-    logger.error(e) 
-    raise
+    logger.error(f"Error processing df_fact_cliente_venta: {e}")
+    raise ValueError(f"Error processing df_fact_cliente_venta: {e}") 

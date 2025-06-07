@@ -1,17 +1,15 @@
 import datetime as dt
-from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths, COD_PAIS
+from common_jobs_functions import logger, SPARK_CONTROLLER, data_paths
 from pyspark.sql.functions import col, upper, lit, cast
 
 spark_controller = SPARK_CONTROLLER()
 target_table_name = "dim_clasificacion_cliente" 
 try:
-    cod_pais = COD_PAIS.split(",")
-    df_m_clasificacion_cliente = spark_controller.read_table(data_paths.DOMINIO, "m_clasificacion_cliente", cod_pais = cod_pais).cache()
-
+    df_m_clasificacion_cliente = spark_controller.read_table(data_paths.DOMAIN, "m_clasificacion_cliente").cache()
     logger.info("Dataframes load successfully")
 except Exception as e:
-    logger.error(e)
-    raise 
+    logger.error(f"Error reading tables: {e}")
+    raise ValueError(f"Error reading tables: {e}")
 try:
     logger.info("Starting creation of df_m_clasificacion_cliente_subgiro")
     df_m_clasificacion_cliente_subgiro = (
@@ -83,8 +81,9 @@ try:
 
     column_keys = ["id_clasificacion_cliente"]
     partition_keys = ["id_pais"]
-    
-    spark_controller.upsert(df_dim_clasificacion_cliente, data_paths.COMERCIAL, target_table_name, column_keys, partition_keys) 
+    logger.info(f"starting upsert of {target_table_name}")
+    spark_controller.upsert(df_dim_clasificacion_cliente, data_paths.ANALYTICS, target_table_name, column_keys, partition_keys)
+    logger.info(f"Upsert de {target_table_name} success completed")
 except Exception as e:
-    logger.error(e)
-    raise
+    logger.error(f"Error processing df_dim_clasificacion_cliente: {e}")
+    raise ValueError(f"Error processing df_dim_clasificacion_cliente: {e}") 

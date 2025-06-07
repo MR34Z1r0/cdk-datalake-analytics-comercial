@@ -23,8 +23,10 @@ try:
 
     df_dom_m_medio_transporte = (
         m_vehiculo.alias("mv")
-        .join(m_compania.alias("mc"), col("mc.cod_compania") == col("mv.cod_compania"), "inner")
-        .join(m_pais.alias("mp"), col("mp.cod_pais") == col("mc.cod_pais"), "inner")
+        .join(m_compania.alias("mc"), 
+              col("mc.cod_compania") == col("mv.cod_compania"), "inner")
+        .join(m_pais.alias("mp"), 
+              col("mp.cod_pais") == col("mc.cod_pais"), "inner")
         .join(m_tipo_vehiculo.alias("mtv"), ((col("mv.cod_tipo_vehiculo") == col("mtv.cod_tipo_vehiculo")) & (col("mv.cod_compania") == col("mtv.cod_compania"))), "inner")
         .join(m_capacidad_vehiculo.alias("mcv"), ((col("mv.cod_tipo_vehiculo") == col("mcv.cod_tipo_capacidad_vehiculo")) & (col("mv.cod_compania") == col("mcv.cod_compania"))), "left")
         .select(
@@ -45,7 +47,7 @@ try:
         .distinct()
     )
 
-    tmp = df_dom_m_medio_transporte.select(
+    df_dom_m_medio_transporte = df_dom_m_medio_transporte.select(
         col("id_medio_transporte").cast("string").alias("id_medio_transporte"),
         col("id_pais").cast("string").alias("id_pais"),
         col("cod_medio_transporte").cast("string").alias("cod_medio_transporte"),
