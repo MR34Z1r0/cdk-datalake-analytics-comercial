@@ -164,7 +164,7 @@ try:
         )
         .join(
             df_m_operacion_filter.alias("mo"),
-            col("tv.id_operacion") == col("mo.id_operacion"),
+            col("tvd.id_operacion") == col("mo.id_operacion"),
             "inner",
         )        
         .select(
